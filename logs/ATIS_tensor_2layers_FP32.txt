@@ -1,0 +1,2 @@
+Namespace(batch_size=32, d_inner_hid=2048, d_k=64, d_model=768, d_v=64, dropout=0.1, embs_share_weight=False, epoch=500, label_smoothing=True, log=None, n_head=8, n_layers=6, n_warmup_steps=40000, no_cuda=False, ops_idx=None, precondition=0, proj_share_weight=True, quantized=1, save_mode='best', save_model='model/ATIS_tensor_2layers_FP32', src_vocab_size=19213, tensorized=1, tgt_vocab_size=10839, uncompressed=0)
+0
