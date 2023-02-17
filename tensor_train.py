@@ -323,6 +323,8 @@ transformer = Transformer_sentence_concat_SLU(n_src_vocab, d_word_vec, n_layers,
             tensorized = tensorized,
             uncompressed=uncompressed)
 
+print(transformer)
+
 transformer_old = Transformer_sentence_concat_SLU(n_src_vocab, d_word_vec, n_layers, n_head, d_q, d_k, d_v,
             d_model, d_inner, pad_idx, dropout=dropout, n_position=n_position, scale_emb=scale_emb,
             emb_shape = emb_shape,emb_rank = emb_rank, emb_tensor_type = emb_tensor_type,
