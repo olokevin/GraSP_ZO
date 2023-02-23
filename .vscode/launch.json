@@ -1,0 +1,22 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "${workspace}/tensor_train.py",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "env": {
+        "CUDA_VISIBLE_DEVICES": "2"
+      },
+      "args": ["-tensorized","0", "-uncompressed","0", "-precondition","0", "-save_model", "model/ATIS_tensor_2layers_FP32",
+               "-save_mode", "best", "-proj_share_weight", "-label_smoothing", "-batch_size","32", "-epoch", "500",
+               "-config", "configs/ATIS/GraSP_90.yml"],
+      "justMyCode": true
+    }
+  ]
+}

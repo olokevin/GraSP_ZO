@@ -19,14 +19,14 @@ def get_logger(name, logpath, filepath, package_files=[],
         info_file_handler = logging.FileHandler(log_path)
         info_file_handler.setLevel(logging.INFO)
         logger.addHandler(info_file_handler)
-    logger.info(filepath)
-    with open(filepath, 'r') as f:
-        logger.info(f.read())
+    # logger.info(filepath)
+    # with open(filepath, 'r') as f:
+    #     logger.info(f.read())
 
-    for f in package_files:
-        logger.info(f)
-        with open(f, 'r') as package_f:
-            logger.info(package_f.read())
+    # for f in package_files:
+    #     logger.info(f)
+    #     with open(f, 'r') as package_f:
+    #         logger.info(package_f.read())
     if displaying:
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)

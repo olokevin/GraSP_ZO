@@ -11,6 +11,7 @@ from typing import Iterable, List
 import argparse
 import math
 import time
+import os
 
 from tqdm import tqdm
 import torch
@@ -20,11 +21,22 @@ import torch.utils.data
 # from dataset import TranslationDataset, paired_collate_fn
 from torch.utils.data import Dataset
 
-
 import numpy as np
 
 # from sklearn import metrics
 import sklearn.metrics
+
+from tensorboardX import SummaryWriter
+from torchstat import stat
+from tqdm import tqdm
+from utils.init_utils import weights_init
+from utils.common_utils import (get_logger, makedirs, process_config, PresetLRScheduler, str_to_list)
+# from utils.data_utils import get_dataloader
+# from utils.network_utils import get_network
+from utils.model_base import ModelBase
+from pruner.GraSP_attn import GraSP_attn
+
+from pyutils.config import configs
 
 torch.manual_seed(20211214)
 # torch.manual_seed(0)
@@ -110,12 +122,51 @@ def collate_fn_custom(batch):
 
     return torch.tensor(sim_batch),torch.swapaxes(src_batch,0,1),torch.swapaxes(slot_batch,0,1),torch.swapaxes(src_attn_batch,0,1),torch.swapaxes(seg_batch,0,1)
 
+# ==================== GraSP methods ====================
+def init_logger(config):
+    makedirs(config.summary_dir)
+    makedirs(config.checkpoint_dir)
+
+    # set logger
+    path = os.path.dirname(os.path.abspath(__file__))
+    path_model = os.path.join(path, 'tensor_layers/Transformer_tensor/%s.py' % config.network.lower())
+    path_main = os.path.join(path, 'tensor_train.py')
+    path_pruner = os.path.join(path, 'pruner/%s.py' % config.pruner_file)
+    logger = get_logger('log', logpath=config.summary_dir + '/',
+                        filepath=path_model, package_files=[path_main, path_pruner], displaying=False)
+    logger.info(dict(config))
+    writer = SummaryWriter(config.summary_dir)
+    # sys.stdout = open(os.path.join(config.summary_dir, 'stdout.txt'), 'w+')
+    # sys.stderr = open(os.path.join(config.summary_dir, 'stderr.txt'), 'w+')
+    return logger, writer
+
+def get_exception_layers(net, exception):
+    exc = []
+    idx = 0
+    for m in net.modules():
+        if isinstance(m, (nn.Linear, nn.Conv2d)):
+            if idx in exception:
+                exc.append(m)
+            idx += 1
+    return tuple(exc)
+
+def print_mask_information(mb, logger):
+    ratios = mb.get_ratio_at_each_layer()
+    logger.info('** Mask information of %s. Overall Remaining: %.2f%%' % (mb.get_name(), ratios['ratio']))
+    count = 0
+    for k, v in ratios.items():
+        if k == 'ratio':
+            continue
+        logger.info('  (%d) %s: Remaining: %.2f%%' % (count, k, v))
+        count += 1
+
+def get_parameter_number(model):
+    total_num = sum(p.numel() for p in model.parameters())
+    trainable_num = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    return {'Total': total_num, 'Trainable': trainable_num}
 
 ''' Main function '''
 parser = argparse.ArgumentParser()
-
-
-
 parser.add_argument('-ops_idx')
 
 parser.add_argument('-tensorized', type=int, default=1)
@@ -147,33 +198,22 @@ parser.add_argument('-save_mode', type=str, choices=['all', 'best'], default='be
 parser.add_argument('-no_cuda', action='store_true')
 parser.add_argument('-label_smoothing', action='store_true')
 
+parser.add_argument('-config', metavar='FILE', help='config file')
+
 opt = parser.parse_args()
 
 #========= Loading Dataset =========#
-# data = torch.load(opt.data)
-# opt.max_token_seq_len = data['settings'].max_token_seq_len
-
 from torch.utils.data import DataLoader
 
-# training_data, validation_data = prepare_dataloaders(data, opt)
 train_iter = torch.load('processed_data/ATIS_train.pt')
-# train_iter = torch.load('processed_data/snips_train.pt')
-# train_iter = torch.load('processed_data/en_train.pt')
 
-
-# train_iter = load_dataset("glue",'mnli',split='train')
 training_data = DataLoader(train_iter, batch_size=opt.batch_size, collate_fn=collate_fn_custom, shuffle=True)
 
-# val_iter = load_dataset("glue",'mnli',split='validation_matched')
 val_iter = torch.load('processed_data/ATIS_valid.pt')
-# val_iter = torch.load('processed_data/snips_valid.pt')
-# val_iter = torch.load('processed_data/en_valid.pt')
 
 validation_data = DataLoader(val_iter, batch_size=opt.batch_size, collate_fn=collate_fn_custom, shuffle=False)
 
 test_iter = torch.load('processed_data/ATIS_test.pt')
-# test_iter = torch.load('processed_data/snips_test.pt')
-# test_iter = torch.load('processed_data/en_test.pt')
 
 test_data = DataLoader(test_iter, batch_size=opt.batch_size, collate_fn=collate_fn_custom, shuffle=False)
 
@@ -256,27 +296,6 @@ scale_ffn = 2**(-5)
 bit_a = 8
 scale_a = 2**(-5)
 
-# bit_attn = 32
-# scale_attn = 2**(-0)
-# bit_ffn = 32
-# scale_ffn = 2**(-0)
-# bit_a = 32
-# scale_a = 2**(-0)
-
-# bit_attn = 4
-# scale_attn = 2**(-5)
-# bit_ffn = 4
-# scale_ffn = 2**(-5)
-# bit_a = 4
-# scale_a = 2**(-5)
-
-# bit_attn = 2
-# scale_attn = 2**(-5)
-# bit_ffn = 2
-# scale_ffn = 2**(-5)
-# bit_a = 2
-# scale_a = 2**(-5)
-
 
 d_classifier=768
 num_class = 22 #ATIS
@@ -285,13 +304,6 @@ slot_num = 121 #ATIS
 # num_class = 60 #en
 # slot_num = 56 #en
 dropout_classifier = 0.1
-
-
-
-
-# slot_num = 120
-# num_class = 21
-
 
 # classifier_shape = [4,4,8,6,4,4,8,6]
 classifier_shape = [12,8,8,8,8,12]
@@ -344,15 +356,7 @@ transformer_old = Transformer_sentence_concat_SLU(n_src_vocab, d_word_vec, n_lay
 transformer.to(device)
 transformer_old.to(device)
 
-
-
-
 precondition = False
-
-
-
-
-
 
 model = transformer
 
@@ -385,6 +389,7 @@ layer_notensor.append(model.slot_classifier[2])
 layer_notensor.append(model.slot_classifier[-1])
 
 
+#========= Preparing GraSP =========#
 def main():
 
     PATH = 'model/test_ATIS_tensor_2layer_INT4.chkpt'
@@ -395,23 +400,126 @@ def main():
     # PATH = 'models_end2end/MNLI_r20_nopre.chkpt'
     # transformer.load_state_dict(torch.load(PATH))
 
-    epochs = 40
+    epochs = 200
 
-    # torch.save(transformer.encoder.src_word_emb,'model/embedding.chkpt')
-    # torch.save(transformer.classifier,'model/classifier.chkpt')
-    # torch.save(transformer.slot_classifier,'model/slot_classifier.chkpt')
-    # torch.save(transformer.encoder.layer_stack,'model/encoder.chkpt')
+    # ================== .yml parser ==========================
+    # Config: path of *.yml configuration file
+    # Currently disabled, and added at front
+    
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument('config', metavar='FILE', help='config file')
+    # args, opts = parser.parse_known_args()
+
+    # load config *.yml file
+    # recursive: also load default.yaml
+    configs.load(opt.config, recursive=False)
+
+    # ================== Prepare logger ==========================
+    paths = [configs.GraSP.dataset]
+    summn = [configs.GraSP.exp_name]
+    chekn = [configs.GraSP.exp_name]
+    if configs.run.runs is not None:
+        summn.append('run_%s' % configs.run.runs)
+        chekn.append('run_%s' % configs.run.runs)
+    summn.append("summary/")
+    chekn.append("checkpoint/")
+    summary_dir = ["./runs/pruning"] + paths + summn
+    ckpt_dir = ["./runs/pruning"] + paths + chekn
+    configs.GraSP.summary_dir = os.path.join(*summary_dir)
+    configs.GraSP.checkpoint_dir = os.path.join(*ckpt_dir)
+    print("=> config.summary_dir:    %s" % configs.GraSP.summary_dir)
+    print("=> config.checkpoint_dir: %s" % configs.GraSP.checkpoint_dir)
+
+    logger, writer = init_logger(configs.GraSP)
+    t_batch = next(iter(training_data))
+    targets, inputs, slot_label,attn,seg = map(lambda x: x.to(device), t_batch)
+    
+    # ====================================== graph and stat ======================================
+    writer.add_graph(model, (inputs,attn,seg))
+    writer.close()
+    for name,parameters in model.named_parameters():
+        print(name,':',parameters.size())
+
+    print(get_parameter_number(model))
+    # stat(model, (inputs,attn,seg))
+
+    # ====================================== build ModelBase ======================================
+    # first three: only used for 
+    mb = ModelBase(configs.GraSP.network, configs.GraSP.depth, configs.GraSP.dataset, model)
+    mb.cuda()
+
+    # ====================================== fetch configs ======================================
+    ckpt_path = configs.GraSP.checkpoint_dir
+    num_iterations = configs.GraSP.iterations
+    target_ratio = configs.GraSP.target_ratio
+    normalize = configs.GraSP.normalize
+
+    # ====================================== fetch exception ======================================
+    # exception = get_exception_layers(mb.model, str_to_list(configs.GraSP.exception, ',', int))
+    # logger.info('Exception: ')
+
+    # for idx, m in enumerate(exception):
+    #     logger.info('  (%d) %s' % (idx, m))
+
+    # ====================================== fetch training schemes ======================================
+    ratio = 1 - (1 - target_ratio) ** (1.0 / num_iterations)
+    logger.info('Normalize: %s, Total iteration: %d, Target ratio: %.2f, Iter ratio %.4f.' %
+                (normalize, num_iterations, target_ratio, ratio))
+
+    # ====================================== start pruning ======================================
+    iteration = 0
+    for _ in range(1):
+        logger.info('** Target ratio: %.4f, iter ratio: %.4f, iteration: %d/%d.' % (target_ratio,
+                                                                                    ratio,
+                                                                                    1,
+                                                                                    num_iterations))
+
+        mb.model.apply(weights_init)
+        print("=> Applying weight initialization(%s)." % configs.GraSP.get('init_method', 'kaiming'))
+        print("Iteration of: %d/%d" % (iteration, num_iterations))
+
+        sample_dataloader = DataLoader(train_iter, batch_size=configs.GraSP.samples_batches*configs.run.batch_size, collate_fn=collate_fn_custom, shuffle=True)
+
+        masks = GraSP_attn(mb.model, ratio, sample_dataloader, 'cuda',
+                      num_iters=configs.GraSP.num_iters)
+                      # samples_batches = configs.GraSP.samples_batches,
+                      # num_classes=configs.GraSP.num_classes,
+                      # samples_per_class=configs.GraSP.samples_per_class,
+        iteration = 0
+        print('=> Using GraSP')
+        # ========== register mask ==================
+        mb.register_mask(masks)
+        # ========== save pruned network ============
+        logger.info('Saving..')
+        state = {
+            'net': mb.model,
+            'acc': -1,
+            'epoch': -1,
+            'args': configs.GraSP,
+            'mask': mb.masks,
+            'ratio': mb.get_ratio_at_each_layer()
+        }
+        path = os.path.join(ckpt_path, 'prune_%s_%s%s_r%s_it%d.pth.tar' % (configs.GraSP.dataset,
+                                                                           configs.GraSP.network,
+                                                                           configs.GraSP.depth,
+                                                                           configs.GraSP.target_ratio,
+                                                                           iteration))
+        torch.save(state, path)
+
+        # ========== print pruning details ============
+        logger.info('**[%d] Mask and training setting: ' % iteration)
+        print_mask_information(mb, logger)
+        # logger.info('  LR: %.5f, WD: %.5f, Epochs: %d' %
+        #             (learning_rates[iteration], weight_decays[iteration], training_epochs[iteration]))
+
+    
 
 
 
     # valid_loss, valid_accu, valid_slot_accu = eval_epoch(transformer, validation_data, device, weight=None)
     block = transformer.encoder.layer_stack[0].slf_attn.w_qs
 
-
-
-
     precondition = (opt.precondition==1)
-    
     
     step = 2
 
@@ -419,8 +527,6 @@ def main():
     par = list(transformer.parameters())
     # for p in par:
     #     p.requires_grad = True
-
-
     lr = 1e-2
 
     # for layer in transformer.modules():
@@ -488,18 +594,23 @@ def main():
             # optimizer = optim.Adam(filter(lambda x: x.requires_grad, layer_notensor.parameters()),
                     # betas=(0.9, 0.98), eps=1e-06, lr = 0)
         else:
+            lr = 1e-3
             optimizer = optim.Adam(
                             filter(lambda x: x.requires_grad, transformer.parameters()),
-                            betas=(0.9, 0.98), eps=1e-06, lr = 1e-4)
+                            betas=(0.9, 0.98), eps=1e-06, lr = lr)
+            lr_schedule = {0: lr,
+                   int(epochs * 0.5): lr * 0.1,
+                   int(epochs * 0.75): lr * 0.01}
+            lr_scheduler = PresetLRScheduler(lr_schedule)
             optimizer_tensor = None
+            optimizer_ZO = None
     valid_acc_all = [-1]
     train_result = []
     test_result = []
     for epoch in range(epochs):
         start = time.time()
 
-
-
+        lr_scheduler(optimizer, epochs)
         train_loss, train_accu, train_slot_accu = train_epoch_bylayer(transformer, training_data, optimizer,optimizer_ZO=optimizer_ZO ,optimizer_tensor=optimizer_tensor,precondition=precondition,device=device,tensor_blocks=tensor_blocks,step=epoch)
 
         # train_loss, train_accu = 0,0
@@ -553,8 +664,6 @@ def main():
 def train_epoch_bylayer(model, training_data, optimizer,optimizer_ZO=None,optimizer_tensor=None, tensor_blocks=None,precondition=False,device='cuda',step=1):
     ''' Epoch operation in training phase'''
 
-    
-
     model.train()
     model.eval()
 
@@ -596,15 +705,8 @@ def train_epoch_bylayer(model, training_data, optimizer,optimizer_ZO=None,optimi
 
         slot_label = torch.flatten(slot_label,start_dim=0, end_dim=1)
 
-
-
-        
-  
-
         loss_MLM =  Loss(pred_slot, slot_label)
         loss = Loss(pred,target)  + loss_MLM
-
-
 
         memory = torch.cuda.max_memory_allocated()/1024/1024/1024
         max_memory = max(max_memory,memory)
@@ -802,6 +904,13 @@ def eval_epoch(model, validation_data, device, **kwargs):
     accuracy_slot = slot_correct/slot_total
     # accuracy_slot
     return loss_per_word, accuracy, f1_score
+
+def build_obj_fn(self, data, target, model, criterion):
+    def _obj_fn():
+        y = model(data)
+        return y, criterion(y, target)
+
+    return _obj_fn
 
 
 def compute_F1(pred,target):

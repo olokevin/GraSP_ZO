@@ -7,10 +7,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from models.model_base import ModelBase
+from utils.model_base import ModelBase
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
-from models.base.init_utils import weights_init
+from utils.init_utils import weights_init
 from utils.common_utils import (get_logger, makedirs, process_config, PresetLRScheduler, str_to_list)
 from utils.data_utils import get_dataloader
 from utils.network_utils import get_network
