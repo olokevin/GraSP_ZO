@@ -13,8 +13,7 @@ def weights_init(m):
     elif isinstance(m, nn.Linear):
         # nn.init.xavier_normal(m.weight)
         nn.init.normal_(m.weight, 0, 0.01)
-        if m.bias != None:
-            nn.init.constant_(m.bias, 0)
+        nn.init.constant_(m.bias, 0)
     elif isinstance(m, nn.BatchNorm2d):
         # Note that BN's running_var/mean are
         # already initialized to 1 and 0 respectively.

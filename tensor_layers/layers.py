@@ -77,8 +77,17 @@ class TensorizedLinear_module(nn.Module):
         self.out_features = out_features
         self.in_shape = shape[0]
         self.out_shape = shape[1]
-        self.tt_rank = [1]+(len(self.in_shape)-1)*[max_rank]+[1]
         self.order = len(shape[0])
+
+        if type(max_rank)==int:
+            self.tt_rank = [1]+(len(self.in_shape)-1)*[max_rank]+[1]
+        elif type(max_rank)==list:
+            if len(max_rank) == self.order+1:
+                self.tt_rank = max_rank
+            else:
+                raise (ValueError("Rank is a list, but length does not match"))
+        else:
+            raise (ValueError("Rank is neither a list nor int"))
 
         if len(self.in_shape) != len(self.out_shape):
             raise (ValueError("the input dim and output dim should be the same"))
@@ -106,9 +115,10 @@ class TensorizedLinear_module(nn.Module):
                 nn.Linear(in_tt_core, out_tt_core, bias=False)
             )
     
-    def forward(self, x):
+    def forward(self, x, ranks = None,scale = None,reconstruct = False,rank_update=False,return_factors = False,prune=False):
+    # def forward(self, x):
         x_shape = tuple(x.shape)
-        batch_sz = x_shape[0]
+        batch_sz = x_shape[0:-1]
         new_shape = x_shape[0:-1] + tuple(self.in_shape)
 
         # x: decomposed as [bz,N_1,N_2,...,N_d]
@@ -118,14 +128,14 @@ class TensorizedLinear_module(nn.Module):
         for i in reversed(range(self.order)):
             # [bz,N1,N2,...,Nd] -> [bzN1N2...Nd-1,Nd]
             temp_shape = output.shape[:-1]
-            output = torch.flatten(output, 0, -2)
+            # output = torch.flatten(output, 0, -2)
             # print('1',output.shape)
             # [bzN1N2...Nd-1,Nd] * [NdRd+1 * RdMd]
             # output = torch.matmul(output, self.tt_cores[i].T)
             output = self.tt_cores[i](output)
             # print('2',output.shape)
             # [bzN1N2...Nd-1,RdMd] -> [bz,N1,N2,...Nd-1,Rd,Md]
-            output = torch.unflatten(output, 0, temp_shape)
+            # output = torch.unflatten(output, 0, temp_shape)
             output = torch.unflatten(output, -1, (self.tt_rank[i],self.out_shape[i]))
             # print('3',output.shape)
             # [bz,N1,N2,...Nd-1,Rd,Md] -> [bz,N1,N2,...,Md,Nd-1,Rd]
@@ -136,207 +146,213 @@ class TensorizedLinear_module(nn.Module):
             # print('5',output.shape)
             i_tp = i_tp - 1
 
-        # permute batch_sz to the dim 0
-        output = torch.permute(output, (-1,)+tuple(range(self.order))).contiguous()
-        # print('end',output.shape)
-        output = torch.reshape(output, (batch_sz, -1))
+        # permute batch_sz back (batch is not only at dim 0)
+        t_dim = len(batch_sz)-1
+        output = torch.unsqueeze(output, dim=t_dim)
+        output = torch.transpose(output, t_dim, -1)
+        output = torch.reshape(output, batch_sz+(-1,))
+        
+        # # permute batch_sz to the dim 0
+        # output = torch.permute(output, (-1,)+tuple(range(self.order))).contiguous()
+        # # print('end',output.shape)
+        # output = torch.reshape(output, (batch_sz, -1))
             
-        if self.bias != 0:
+        if self.bias != None:
             output = output + self.bias
 
         return output
 
 # ================== Old TensorizedLinear_module ==================
 from .tt_fwd_bwd import TT_forward
-# class TensorizedLinear_module(nn.Module):
-#     def __init__(self,
-#                 in_features,
-#                 out_features,
-#                 bias=True,
-#                 init=None,
-#                 shape=None,
-#                 tensor_type='TensorTrainMatrix',
-#                 max_rank=20,
-#                 em_stepsize=1.0,
-#                 prior_type='log_uniform',
-#                 eta = None,
-#                 device=None,
-#                 dtype=None,
-#     ):
+class TensorizedLinear_module_old(nn.Module):
+    def __init__(self,
+                in_features,
+                out_features,
+                bias=True,
+                init=None,
+                shape=None,
+                tensor_type='TensorTrainMatrix',
+                max_rank=20,
+                em_stepsize=1.0,
+                prior_type='log_uniform',
+                eta = None,
+                device=None,
+                dtype=None,
+    ):
 
-#         super(TensorizedLinear_module,self).__init__()
+        super(TensorizedLinear_module,self).__init__()
 
-#         self.tensor_type = tensor_type
+        self.tensor_type = tensor_type
 
-#         self.in_features = in_features
-#         self.out_features = out_features
-#         target_stddev = np.sqrt(1/self.in_features)
+        self.in_features = in_features
+        self.out_features = out_features
+        target_stddev = np.sqrt(1/self.in_features)
 
-#         #shape taken care of at input time
-#         self.tensor = getattr(low_rank_tensors,tensor_type)(shape,prior_type=prior_type,em_stepsize=em_stepsize,max_rank=max_rank,initialization_method='nn',target_stddev=target_stddev,learned_scale=False,eta=eta)
+        #shape taken care of at input time
+        self.tensor = getattr(low_rank_tensors,tensor_type)(shape,prior_type=prior_type,em_stepsize=em_stepsize,max_rank=max_rank,initialization_method='nn',target_stddev=target_stddev,learned_scale=False,eta=eta)
 
-#         if bias == False:
-#             self.bias = 0
-#         else:
-#             stdv = 1. / math.sqrt(out_features)
-#             # self.bias = torch.nn.Parameter(torch.zeros(out_features))
-#             # self.bias.data.uniform_(-stdv, stdv)
-#             self.bias = torch.nn.Parameter(torch.randn(out_features))
-#             self.bias.data.uniform_(-stdv, stdv)
-#     def get_kl(self):
-#         return self.tensor.get_kl_divergence_to_prior()
+        if bias == False:
+            self.bias = 0
+        else:
+            stdv = 1. / math.sqrt(out_features)
+            # self.bias = torch.nn.Parameter(torch.zeros(out_features))
+            # self.bias.data.uniform_(-stdv, stdv)
+            self.bias = torch.nn.Parameter(torch.randn(out_features))
+            self.bias.data.uniform_(-stdv, stdv)
+    def get_kl(self):
+        return self.tensor.get_kl_divergence_to_prior()
 
-#     def get_rank(self):
-#         return self.tensor.get_rank()
+    def get_rank(self):
+        return self.tensor.get_rank()
     
-#     def forward(self, input, ranks = None,scale = None,reconstruct = False,rank_update=False,return_factors = False,prune=False):
+    def forward(self, input, ranks = None,scale = None,reconstruct = False,rank_update=False,return_factors = False,prune=False):
 
-#         if self.training and rank_update:
-#             self.tensor.update_rank_parameters()
+        if self.training and rank_update:
+            self.tensor.update_rank_parameters()
 
 
-#         self.x = input
-#         # print(self.tensor.get_full().shape)
-#         if reconstruct:
-#             # print(input.device)
-#             # print(self.tensor.get_full().device)
-#             return F.linear(input,self.tensor.get_full().reshape([self.out_features,self.in_features]).to(input.device),bias=self.bias)
-#         else:
-#             if self.tensor_type == 'TensorTrainMatrix':
-#                 # output = self.forward_ttm(input)
-#                 return F.linear(input,self.tensor.get_full().reshape([self.out_features,self.in_features]).to(input.device),bias=self.bias)
-#             elif self.tensor_type == 'TensorTrain':
-#                 # output = self.forward_tt(input,target_rank=ranks,scale=scale,return_factors = return_factors,prune = prune) 
-#                 output = TT_forward.apply(input,*self.tensor.factors)
-#                 # print(input.shape)
-#                 # print(output.shape)
-#             if self.bias!=None and return_factors==False:
-#                 output = output + self.bias
-#             return output
+        self.x = input
+        # print(self.tensor.get_full().shape)
+        if reconstruct:
+            # print(input.device)
+            # print(self.tensor.get_full().device)
+            return F.linear(input,self.tensor.get_full().reshape([self.out_features,self.in_features]).to(input.device),bias=self.bias)
+        else:
+            if self.tensor_type == 'TensorTrainMatrix':
+                # output = self.forward_ttm(input)
+                return F.linear(input,self.tensor.get_full().reshape([self.out_features,self.in_features]).to(input.device),bias=self.bias)
+            elif self.tensor_type == 'TensorTrain':
+                # output = self.forward_tt(input,target_rank=ranks,scale=scale,return_factors = return_factors,prune = prune) 
+                output = TT_forward.apply(input,*self.tensor.factors)
+                # print(input.shape)
+                # print(output.shape)
+            if self.bias!=None and return_factors==False:
+                output = output + self.bias
+            return output
         
 
-#     def forward_tt(self,input,target_rank=None, scale = None,return_factors = False,prune=False):
-#         prune = False
-#         if target_rank==None:
-#             ranks = [U.shape[0] for U in self.tensor.factors] + [1]
-#         elif isinstance(target_rank, list):
-#             ranks = target_rank
-#         else:
-#             ranks = [1] + [target_rank]*(len(self.tensor.factors)-1) + [1]
+    def forward_tt(self,input,target_rank=None, scale = None,return_factors = False,prune=False):
+        prune = False
+        if target_rank==None:
+            ranks = [U.shape[0] for U in self.tensor.factors] + [1]
+        elif isinstance(target_rank, list):
+            ranks = target_rank
+        else:
+            ranks = [1] + [target_rank]*(len(self.tensor.factors)-1) + [1]
 
-#         if scale==None:
-#             scale = 1.0
+        if scale==None:
+            scale = 1.0
 
-#         m = len(self.tensor.factors)//2
+        m = len(self.tensor.factors)//2
         
  
-#         if len(input.shape)==2:
-#             mat_shape = [input.shape[0]] + [U.shape[1] for U in self.tensor.factors[0:m]]
-#             N=2
-#         elif len(input.shape)==3:
-#             N=3
-#             mat_shape = [input.shape[0]]+[input.shape[1]] + [U.shape[1] for U in self.tensor.factors[0:m]]
-#         input = torch.reshape(input, [1] + mat_shape)
+        if len(input.shape)==2:
+            mat_shape = [input.shape[0]] + [U.shape[1] for U in self.tensor.factors[0:m]]
+            N=2
+        elif len(input.shape)==3:
+            N=3
+            mat_shape = [input.shape[0]]+[input.shape[1]] + [U.shape[1] for U in self.tensor.factors[0:m]]
+        input = torch.reshape(input, [1] + mat_shape)
 
-#         if prune == True:
-#             self.tensor.prune_ranks()
-#             mask = self.tensor.masks + [torch.tensor([1]).to(input.device)]
-#             mask = [x.unsqueeze(0).unsqueeze(0) for x in mask]
+        if prune == True:
+            self.tensor.prune_ranks()
+            mask = self.tensor.masks + [torch.tensor([1]).to(input.device)]
+            mask = [x.unsqueeze(0).unsqueeze(0) for x in mask]
 
 
 
             
-#             out = self.tensor.factors[0]*mask[0]
+            out = self.tensor.factors[0]*mask[0]
     
             
-#             out = torch.squeeze(out)
+            out = torch.squeeze(out)
 
-#             for i in range(1,m):
-#                 U = self.tensor.factors[i]*mask[i]
-#                 out = torch.tensordot(out, U, [[-1],[0]])
+            for i in range(1,m):
+                U = self.tensor.factors[i]*mask[i]
+                out = torch.tensordot(out, U, [[-1],[0]])
 
 
-#             S = 100
-#             out = torch.tensordot(input/S, out, [list(range(N,N+m)), list(range(0,m))]) * S
+            S = 100
+            out = torch.tensordot(input/S, out, [list(range(N,N+m)), list(range(0,m))]) * S
     
-#             out = [out] + self.tensor.factors[m:]
+            out = [out] + self.tensor.factors[m:]
 
 
 
-#             N = len(out[0].shape)
-#             output = self.tensor.factors[m]*mask[m]
+            N = len(out[0].shape)
+            output = self.tensor.factors[m]*mask[m]
 
 
-#             for i in range(m+1,2*m):
-#                 U = self.tensor.factors[i]*mask[i]
-#                 output = torch.tensordot(output,U,[[-1],[0]])
+            for i in range(m+1,2*m):
+                U = self.tensor.factors[i]*mask[i]
+                output = torch.tensordot(output,U,[[-1],[0]])
             
-#             output = torch.tensordot(out[0]/S,output,[[-1],[0]])*S
+            output = torch.tensordot(out[0]/S,output,[[-1],[0]])*S
 
-#             output = torch.flatten(output, start_dim = N-1, end_dim = -1)
-#             output = torch.squeeze(output)
-#             # if torch.max(mask[0])==0:
-#             #     print(torch.max(output))
-#         else:
-#             out = self.tensor.factors[0]
+            output = torch.flatten(output, start_dim = N-1, end_dim = -1)
+            output = torch.squeeze(output)
+            # if torch.max(mask[0])==0:
+            #     print(torch.max(output))
+        else:
+            out = self.tensor.factors[0]
             
-#             out = torch.squeeze(out)
+            out = torch.squeeze(out)
 
-#             for i in range(1,m):
-#                 U = self.tensor.factors[i]
-#                 out = torch.tensordot(out, U, [[-1],[0]])
+            for i in range(1,m):
+                U = self.tensor.factors[i]
+                out = torch.tensordot(out, U, [[-1],[0]])
 
 
-#             S = 100
-#             out = torch.tensordot(input/S, out, [list(range(N,N+m)), list(range(0,m))]) * S
+            S = 100
+            out = torch.tensordot(input/S, out, [list(range(N,N+m)), list(range(0,m))]) * S
     
-#             out = [out] + self.tensor.factors[m:]
+            out = [out] + self.tensor.factors[m:]
 
 
 
-#             N = len(out[0].shape)
-#             output = self.tensor.factors[m]
+            N = len(out[0].shape)
+            output = self.tensor.factors[m]
 
 
-#             for i in range(m+1,2*m):
-#                 U = self.tensor.factors[i]
-#                 output = torch.tensordot(output,U,[[-1],[0]])
+            for i in range(m+1,2*m):
+                U = self.tensor.factors[i]
+                output = torch.tensordot(output,U,[[-1],[0]])
             
-#             output = torch.tensordot(out[0]/S,output,[[-1],[0]])*S
+            output = torch.tensordot(out[0]/S,output,[[-1],[0]])*S
 
-#             output = torch.flatten(output, start_dim = N-1, end_dim = -1)
-#             output = torch.squeeze(output)
+            output = torch.flatten(output, start_dim = N-1, end_dim = -1)
+            output = torch.squeeze(output)
 
 
-#         return output
+        return output
 
-#     def forward_ttm(self,matrix):
-#         # Prepare tensor shape
-#         mat_shape = list(matrix.shape)
-#         if len(mat_shape) == 3:
-#             N = 2
-#         else:
-#             N = 1
+    def forward_ttm(self,matrix):
+        # Prepare tensor shape
+        mat_shape = list(matrix.shape)
+        if len(mat_shape) == 3:
+            N = 2
+        else:
+            N = 1
 
-#         tensor = self.tensor
+        tensor = self.tensor
 
-#         tensorized_shape_x, tensorized_shape_y = tensor.dims1, tensor.dims2
-#         # print(tensorized_shape_x,tensorized_shape_y)
-#         output = matrix.reshape(mat_shape[0:N] + tensorized_shape_x + [1])
+        tensorized_shape_x, tensorized_shape_y = tensor.dims1, tensor.dims2
+        # print(tensorized_shape_x,tensorized_shape_y)
+        output = matrix.reshape(mat_shape[0:N] + tensorized_shape_x + [1])
         
-#         order = len(tensorized_shape_x)
+        order = len(tensorized_shape_x)
 
-#         for i in range(order):
-#             output = torch.tensordot(output,tensor.factors[i],[[N,-1],[1,0]])
-#             # print(output.shape)
+        for i in range(order):
+            output = torch.tensordot(output,tensor.factors[i],[[N,-1],[1,0]])
+            # print(output.shape)
 
-#         output = torch.flatten(output,start_dim = N, end_dim = -1)
+        output = torch.flatten(output,start_dim = N, end_dim = -1)
 
-#         return output
+        return output
 
 
-#     def update_rank_parameters(self):
-#         self.tensor.update_rank_parameters()
+    def update_rank_parameters(self):
+        self.tensor.update_rank_parameters()
 
 
 

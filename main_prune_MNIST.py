@@ -7,14 +7,16 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from utils.model_base import ModelBase
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from utils.init_utils import weights_init
 from utils.common_utils import (get_logger, makedirs, process_config, PresetLRScheduler, str_to_list)
 from utils.data_utils import get_dataloader
 from utils.network_utils import get_network
+from models.model_base import ModelBase
 from pruner.GraSP import GraSP
+
+from pyutils.config import configs
 
 
 def get_args():
@@ -208,54 +210,91 @@ def get_exception_layers(net, exception):
             idx += 1
     return tuple(exc)
 
+class MNIST_FC(nn.Module):
+    def __init__(self):
+        super(MNIST_FC, self).__init__()
+        self.dropout = nn.Dropout(0.5)
+        self.fc1 = nn.Linear(784, 256, bias=False)
+        self.fc2 = nn.Linear(256, 10, bias=False)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        x = torch.flatten(x,1)
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        output = self.fc2(x)
+        return output
+
+model = MNIST_FC()
 
 def main(config):
-    # init logger
-    classes = {
-        'cifar10': 10,
-        'cifar100': 100,
-        'mnist': 10,
-        'tiny_imagenet': 200
-    }
-    logger, writer = init_logger(config)
+    # ================== .yml parser ==========================
+    # Config: path of *.yml configuration file
+    # Currently disabled, and added at front
+    
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument('config', metavar='FILE', help='config file')
+    # args, opts = parser.parse_known_args()
 
-    # build model
-    model = get_network(config.network, config.depth, config.dataset, use_bn=config.get('use_bn', True))
-    mask = None
-    mb = ModelBase(config.network, config.depth, config.dataset, model)
+    # load config *.yml file
+    # recursive: also load default.yaml
+    configs.load(opt.config, recursive=False)
+
+    # ================== Prepare logger ==========================
+    paths = [configs.GraSP.dataset]
+    summn = [configs.GraSP.exp_name]
+    chekn = [configs.GraSP.exp_name]
+    if configs.run.runs is not None:
+        summn.append('run_%s' % configs.run.runs)
+        chekn.append('run_%s' % configs.run.runs)
+    summn.append("summary/")
+    chekn.append("checkpoint/")
+    summary_dir = ["./runs/pruning"] + paths + summn
+    ckpt_dir = ["./runs/pruning"] + paths + chekn
+    configs.GraSP.summary_dir = os.path.join(*summary_dir)
+    configs.GraSP.checkpoint_dir = os.path.join(*ckpt_dir)
+    print("=> config.summary_dir:    %s" % configs.GraSP.summary_dir)
+    print("=> config.checkpoint_dir: %s" % configs.GraSP.checkpoint_dir)
+
+    logger, writer = init_logger(configs.GraSP)
+    
+    # ====================================== graph and stat ======================================
+    # t_batch = next(iter(training_data))
+    # targets, inputs, slot_label,attn,seg = map(lambda x: x.to(device), t_batch)
+    # writer.add_graph(model, (inputs,attn,seg))
+    # writer.close()
+    # for name,parameters in model.named_parameters():
+    #     print(name,':',parameters.size())
+
+    # print(get_parameter_number(model))
+    # # stat(model, (inputs,attn,seg))
+
+    # ====================================== build ModelBase ======================================
+    mb = ModelBase(configs.GraSP.network, configs.GraSP.depth, configs.GraSP.dataset, model)
     mb.cuda()
-    if mask is not None:
-        mb.register_mask(mask)
-        print_mask_information(mb, logger)
 
     # preprocessing
     # ====================================== get dataloader ======================================
-    trainloader, testloader = get_dataloader(config.dataset, config.batch_size, 256, 4)
+    trainloader, testloader = get_dataloader(config.GraSP.dataset, config.batch_size, 256, 4)
+    
     # ====================================== fetch configs ======================================
-    ckpt_path = config.checkpoint_dir
-    num_iterations = config.iterations
-    target_ratio = config.target_ratio
-    normalize = config.normalize
-    # ====================================== fetch exception ======================================
-    exception = get_exception_layers(mb.model, str_to_list(config.exception, ',', int))
-    logger.info('Exception: ')
+    ckpt_path = configs.GraSP.checkpoint_dir
+    num_iterations = configs.GraSP.iterations
+    target_ratio = configs.GraSP.target_ratio
+    normalize = configs.GraSP.normalize
 
-    for idx, m in enumerate(exception):
-        logger.info('  (%d) %s' % (idx, m))
+    # ====================================== fetch exception ======================================
+    # exception = get_exception_layers(mb.model, str_to_list(configs.GraSP.exception, ',', int))
+    # logger.info('Exception: ')
+
+    # for idx, m in enumerate(exception):
+    #     logger.info('  (%d) %s' % (idx, m))
 
     # ====================================== fetch training schemes ======================================
     ratio = 1 - (1 - target_ratio) ** (1.0 / num_iterations)
-    learning_rates = str_to_list(config.learning_rate, ',', float)
-    weight_decays = str_to_list(config.weight_decay, ',', float)
-    training_epochs = str_to_list(config.epoch, ',', int)
     logger.info('Normalize: %s, Total iteration: %d, Target ratio: %.2f, Iter ratio %.4f.' %
                 (normalize, num_iterations, target_ratio, ratio))
-    logger.info('Basic Settings: ')
-    for idx in range(len(learning_rates)):
-        logger.info('  %d: LR: %.5f, WD: %.5f, Epochs: %d' % (idx,
-                                                              learning_rates[idx],
-                                                              weight_decays[idx],
-                                                              training_epochs[idx]))
 
     # ====================================== start pruning ======================================
     iteration = 0
@@ -266,8 +305,9 @@ def main(config):
                                                                                     num_iterations))
 
         mb.model.apply(weights_init)
-        print("=> Applying weight initialization(%s)." % config.get('init_method', 'kaiming'))
+        print("=> Applying weight initialization(%s)." % configs.GraSP.get('init_method', 'kaiming'))
         print("Iteration of: %d/%d" % (iteration, num_iterations))
+
         masks = GraSP(mb.model, ratio, trainloader, 'cuda',
                       num_classes=classes[config.dataset],
                       samples_per_class=config.samples_per_class,
@@ -282,22 +322,22 @@ def main(config):
             'net': mb.model,
             'acc': -1,
             'epoch': -1,
-            'args': config,
+            'args': configs.GraSP,
             'mask': mb.masks,
             'ratio': mb.get_ratio_at_each_layer()
         }
-        path = os.path.join(ckpt_path, 'prune_%s_%s%s_r%s_it%d.pth.tar' % (config.dataset,
-                                                                           config.network,
-                                                                           config.depth,
-                                                                           config.target_ratio,
+        path = os.path.join(ckpt_path, 'prune_%s_%s%s_r%s_it%d.pth.tar' % (configs.GraSP.dataset,
+                                                                           configs.GraSP.network,
+                                                                           configs.GraSP.depth,
+                                                                           configs.GraSP.target_ratio,
                                                                            iteration))
         torch.save(state, path)
 
         # ========== print pruning details ============
         logger.info('**[%d] Mask and training setting: ' % iteration)
         print_mask_information(mb, logger)
-        logger.info('  LR: %.5f, WD: %.5f, Epochs: %d' %
-                    (learning_rates[iteration], weight_decays[iteration], training_epochs[iteration]))
+        # logger.info('  LR: %.5f, WD: %.5f, Epochs: %d' %
+        #             (learning_rates[iteration], weight_decays[iteration], training_epochs[iteration]))
 
         # ========== finetuning =======================
         train_once(mb=mb,

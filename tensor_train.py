@@ -33,7 +33,7 @@ from utils.init_utils import weights_init
 from utils.common_utils import (get_logger, makedirs, process_config, PresetLRScheduler, str_to_list)
 # from utils.data_utils import get_dataloader
 # from utils.network_utils import get_network
-from utils.model_base import ModelBase
+from models.model_base import ModelBase
 from pruner.GraSP_attn import GraSP_attn
 
 from pyutils.config import configs
@@ -220,7 +220,7 @@ test_data = DataLoader(test_iter, batch_size=opt.batch_size, collate_fn=collate_
 opt.src_vocab_size = 19213
 opt.tgt_vocab_size = 10839
 
-#========= Preparing Model =========#
+# ================== Preparing Model ================== #
 if opt.embs_share_weight:
     assert training_data.dataset.src_word2idx == training_data.dataset.tgt_word2idx, \
         'The src/tgt word2idx table are different but asked to share word embedding.'
@@ -228,6 +228,8 @@ if opt.embs_share_weight:
 print(opt)
 
 device = torch.device('cuda')
+
+# ========= Model Shape ========= #
 
 n_src_vocab = 148669 ##QNLI
 n_src_vocab = 143179 ##MNLI
@@ -250,13 +252,10 @@ dropout = 0.1
 n_position = 512
 scale_emb = True
 
-# emb_shape = [[15,20,20,25],[4,4,8,6]]
-# emb_shape = [[16,20,10,10],[4,4,8,6]]
-# emb_shape = [[5,5,4,8],[4,4,8,6]]
+# ========= Tensor Shape ========= #
+
 # emb_shape = [[5,5,4,4,2],[3,4,4,4,4]] #ATIS shape
 emb_shape = [[8,5,5,4,8],[4,4,4,4,3]]
-# emb_shape = [[10,10,10,10],[4,4,8,6]]
-
 
 emb_rank = 30
 emb_tensor_type = 'TensorTrainMatrix'
@@ -268,26 +267,34 @@ trg_tensor_type = 'TensorTrainMatrix'
 r = 20
 r_attn = 20
 
-attention_shape = [[12,8,8,8,8,12],[12,8,8,8,8,12]]
-# attention_rank = [r_attn,r_attn]
-attention_rank = [[1,12,r_attn,r_attn,r_attn,12,1], [1,12,r_attn,r_attn,r_attn,12,1]]
-# attention_rank = [[1,r_attn,r_attn,r_attn,r_attn,r_attn,1], [1,r_attn,r_attn,r_attn,r_attn,r_attn,1]]
-attention_tensor_type = 'TensorTrain'
+# ========= Yequan's TensorTrainMatrix Version ========= #
+attention_shape = [[[12,8,8],[8,8,12]], [[12,8,8],[8,8,12]]]
+attention_rank = [[1,r_attn,r_attn,1], [1,r_attn,r_attn,1]]
+attention_tensor_type = 'TensorTrainMatrix'
 
-ffn_shape = [[12,8,8,12,16,16],[16,16,12,8,8,12]]
-# ffn_rank = [r,r]
-ffn_rank = [[1,12,r,r,r,16,1], [1,16,r,r,r,12,1]]
-# ffn_rank = [[1,r,r,r,r,r,1], [1,r,r,r,r,r,1]]
+ffn_shape = [[[12,8,8],[12,16,16]], [[16,16,12],[8,8,12]]]
+ffn_rank = [[1,r,r,1], [1,r,r,1]]
 
-ffn_tensor_type = 'TensorTrain'
+ffn_tensor_type = 'TensorTrainMatrix'
 
-# attention_shape = [[4,4,8,6,4,4,8,6],[4,4,8,6,4,4,8,6]]
-# attention_rank = [r,r]
+classifier_shape = [[12,8,8], [8,8,12]]
+classifier_rank = [1,r,r,1]
+classifier_tensor_type = 'TensorTrainMatrix'
+
+# ========= Zi Yang's TensorTrain Version ========= #
+# attention_shape = [[12,8,8,8,8,12],[12,8,8,8,8,12]]
+# attention_rank = [[1,12,r_attn,r_attn,r_attn,12,1], [1,12,r_attn,r_attn,r_attn,12,1]]
 # attention_tensor_type = 'TensorTrain'
 
-# ffn_shape = [[4,4,8,6,6,8,8,8],[6,8,8,8,4,4,8,6]]
-# ffn_rank = [r,r]
+# ffn_shape = [[12,8,8,12,16,16],[16,16,12,8,8,12]]
+# ffn_rank = [[1,12,r,r,r,16,1], [1,16,r,r,r,12,1]]
 # ffn_tensor_type = 'TensorTrain'
+
+# classifier_shape = [12,8,8,8,8,12]
+# classifier_rank = [1,12,r,r,r,12,1]
+# classifier_tensor_type = 'TensorTrain'
+
+# ========= Quant ========= #
 
 bit_attn = 8
 scale_attn = 2**(-5)
@@ -304,13 +311,6 @@ slot_num = 121 #ATIS
 # num_class = 60 #en
 # slot_num = 56 #en
 dropout_classifier = 0.1
-
-# classifier_shape = [4,4,8,6,4,4,8,6]
-classifier_shape = [12,8,8,8,8,12]
-classifier_rank = [1,12,r,r,r,12,1]
-# classifier_rank = [1,r,r,r,r,r,1]
-
-classifier_tensor_type = 'TensorTrain'
 
 quantized = False
 tensorized = (opt.tensorized == 1)
@@ -336,6 +336,21 @@ transformer = Transformer_sentence_concat_SLU(n_src_vocab, d_word_vec, n_layers,
             uncompressed=uncompressed)
 
 print(transformer)
+
+from tensor_layers.layers import TensorizedLinear_module
+def extract_trainable_parameters(model):
+    # always flatten the parameters
+    return {
+        layer_name: {
+            "tt_cores"+str(i): getattr(layer,'tt_cores')[i].weight.view(-1)
+            for i in range(getattr(layer, 'order'))
+        }
+        for layer_name, layer in model.named_modules()
+        if isinstance(layer, (TensorizedLinear_module))
+    }
+
+trainable_params = extract_trainable_parameters(transformer)
+print(trainable_params)
 
 transformer_old = Transformer_sentence_concat_SLU(n_src_vocab, d_word_vec, n_layers, n_head, d_q, d_k, d_v,
             d_model, d_inner, pad_idx, dropout=dropout, n_position=n_position, scale_emb=scale_emb,
@@ -431,10 +446,11 @@ def main():
     print("=> config.checkpoint_dir: %s" % configs.GraSP.checkpoint_dir)
 
     logger, writer = init_logger(configs.GraSP)
+
+    # ====================================== graph and stat ======================================
     t_batch = next(iter(training_data))
     targets, inputs, slot_label,attn,seg = map(lambda x: x.to(device), t_batch)
     
-    # ====================================== graph and stat ======================================
     writer.add_graph(model, (inputs,attn,seg))
     writer.close()
     for name,parameters in model.named_parameters():
@@ -527,7 +543,7 @@ def main():
     par = list(transformer.parameters())
     # for p in par:
     #     p.requires_grad = True
-    lr = 1e-2
+    lr = 1e-3
 
     # for layer in transformer.modules():
     #     if hasattr(layer, 'tensor'):
@@ -598,12 +614,13 @@ def main():
             optimizer = optim.Adam(
                             filter(lambda x: x.requires_grad, transformer.parameters()),
                             betas=(0.9, 0.98), eps=1e-06, lr = lr)
-            lr_schedule = {0: lr,
-                   int(epochs * 0.5): lr * 0.1,
-                   int(epochs * 0.75): lr * 0.01}
-            lr_scheduler = PresetLRScheduler(lr_schedule)
             optimizer_tensor = None
             optimizer_ZO = None
+    
+    lr_schedule = {0: lr,
+                   int(epochs * 0.5): lr * 0.1,
+                   int(epochs * 0.75): lr * 0.01}
+    lr_scheduler = PresetLRScheduler(lr_schedule)
     valid_acc_all = [-1]
     train_result = []
     test_result = []

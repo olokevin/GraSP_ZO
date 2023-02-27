@@ -1,0 +1,40 @@
+GraSP:
+  exp_name: "MNIST_GraSP_prune_ratio_90"
+  network: fc
+  depth: 2
+  dataset: mnist
+  batch_size: 128
+  epoch: 160
+  learning_rate: 0.1
+  weight_decay: 1e-4
+  exception: -1
+  iterations: 1
+  normalize: false
+  target_ratio: 0.9
+  pruner: GraSP
+  pruner_file: GraSP
+  num_classes: 21
+  samples_per_class: 10
+  samples_batches: 5
+  num_iters: 1
+
+run:
+  runs: None
+  n_epochs: 100
+  batch_size: 32
+  use_cuda: 1
+  gpu_id: 0
+  deterministic: 1
+  log_interval: 200
+  train_noise: 0
+
+model:
+  tensorized: 0
+  uncompressed: 0
+  precondition: 0
+
+checkpoint:
+  save_model: "model/MNIST_notensor_2layers_FP32"
+  save_mode: "best"
+  proj_share_weight: 1
+  label_smoothing: 1
