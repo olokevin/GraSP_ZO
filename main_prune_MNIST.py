@@ -14,25 +14,14 @@ from utils.common_utils import (get_logger, makedirs, process_config, PresetLRSc
 from utils.data_utils import get_dataloader
 from utils.network_utils import get_network
 from models.model_base import ModelBase
-from pruner.GraSP import GraSP
+from pruner.GraSP_zo_mask import GraSP_zo_mask
 
 from pyutils.config import configs
+from optimizer import ZO_SCD_mask, ZO_SGD_mask
 
+from tensor_layers.layers import TensorizedLinear_module
 
-def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--target_ratio', type=float)
-    parser.add_argument('--iteration', type=int)
-    parser.add_argument('--reset_to', type=int)
-
-    parser.add_argument('--network', type=str, default='vgg')
-    parser.add_argument('--dataset', type=str, default='cifar10')
-    parser.add_argument('--depth', type=int, default=19)
-
-    parser.add_argument('--pretrain_model', type=str)
-    parser.add_argument('--log_dir', type=str, default='runs/')
-
-
+# disabled
 def init_config():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, required=True)
@@ -97,7 +86,7 @@ def save_state(net, acc, epoch, loss, config, ckpt_path, is_best=False):
                                                             config.depth))
 
 
-def train(net, loader, optimizer, criterion, lr_scheduler, epoch, writer, iteration):
+def train(net, loader, optimizer, criterion, lr_scheduler, epoch, writer, iteration, logger):
     print('\nEpoch: %d' % epoch)
     net.train()
     train_loss = 0
@@ -114,11 +103,17 @@ def train(net, loader, optimizer, criterion, lr_scheduler, epoch, writer, iterat
     for batch_idx, (inputs, targets) in prog_bar:
         inputs, targets = inputs.cuda(), targets.cuda()
         optimizer.zero_grad()
-        outputs = net(inputs)
-        loss = criterion(outputs, targets)
-        # import pdb; pdb.set_trace()
-        loss.backward()
-        optimizer.step()
+        # outputs = net(inputs)
+        # loss = criterion(outputs, targets)
+        # loss.backward()
+
+        if isinstance(optimizer, (ZO_SCD_mask, ZO_SGD_mask)):
+            outputs, loss = optimizer.step(inputs, targets)
+        else:
+            outputs = net(inputs)
+            loss = criterion(outputs, targets)
+            loss.backward()
+            optimizer.step()
 
         train_loss += loss.item()
         _, predicted = outputs.max(1)
@@ -129,11 +124,18 @@ def train(net, loader, optimizer, criterion, lr_scheduler, epoch, writer, iterat
                 (lr_scheduler.get_lr(optimizer), train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
         prog_bar.set_description(desc, refresh=True)
 
-    writer.add_scalar('iter_%d/train/loss' % iteration, train_loss / (batch_idx + 1), epoch)
-    writer.add_scalar('iter_%d/train/acc' % iteration, 100. * correct / total, epoch)
+        # logger.info('epoch[%d], batch_idx[%d], train_loss acc: %.4f' % (epoch, batch_idx, train_loss))
+
+    train_loss = train_loss / (batch_idx + 1)
+    train_acc  = 100. * correct / total
+        
+    logger.info('epoch[%d], lr: %.4f, train_loss: %.4f, train_acc: %.4f' % (epoch, lr_scheduler.get_lr(optimizer), train_loss, train_acc))
+        
+    writer.add_scalar('iter_%d/train/loss' % iteration, train_loss, epoch)
+    writer.add_scalar('iter_%d/train/acc' % iteration, train_acc, epoch)
 
 
-def test(net, loader, criterion, epoch, writer, iteration):
+def test(net, loader, criterion, epoch, writer, iteration, logger):
     net.eval()
     test_loss = 0
     correct = 0
@@ -158,40 +160,76 @@ def test(net, loader, criterion, epoch, writer, iteration):
             prog_bar.set_description(desc, refresh=True)
 
     # Save checkpoint.
-    acc = 100. * correct / total
+    test_loss = test_loss / (batch_idx + 1)
+    test_acc = 100. * correct / total
 
-    writer.add_scalar('iter_%d/test/loss' % iteration, test_loss / (batch_idx + 1), epoch)
-    writer.add_scalar('iter_%d/test/acc' % iteration, 100. * correct / total, epoch)
-    return acc
+    logger.info('epoch[%d], test_loss: %.4f, test_acc: %.4f' % (epoch, test_loss, test_acc))
+
+    writer.add_scalar('iter_%d/test/loss' % iteration, test_loss, epoch)
+    writer.add_scalar('iter_%d/test/acc' % iteration, test_acc, epoch)
+    return test_acc
 
 
-def train_once(mb, net, trainloader, testloader, writer, config, ckpt_path, learning_rate, weight_decay, num_epochs,
+def train_once(mb, net, named_masks, trainloader, testloader, writer, config, ckpt_path, learning_rate, weight_decay, num_epochs,
                iteration, logger):
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9, weight_decay=weight_decay)
-    lr_schedule = {0: learning_rate,
-                   int(num_epochs * 0.5): learning_rate * 0.1,
-                   int(num_epochs * 0.75): learning_rate * 0.01}
+    
+    if config.optimizer.name == 'ZO_SCD_mask':
+        net.requires_grad_(False)
+        optimizer = ZO_SCD_mask(
+            model = net, 
+            criterion = criterion,
+            masks = named_masks,
+            lr = learning_rate,
+            grad_sparsity = config.optimizer.grad_sparsity
+        )
+    elif config.optimizer.name == 'ZO_SGD_mask':
+        net.requires_grad_(False)
+        optimizer = ZO_SGD_mask(
+            model = net, 
+            criterion = criterion,
+            masks = named_masks,
+            lr = learning_rate,
+            sigma = config.optimizer.sigma,
+            n_sample  = config.optimizer.n_sample,
+            signSGD = config.optimizer.signSGD,
+            tensorized = False
+        )
+    elif config.optimizer.name == 'SGD':
+        optimizer = optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9, weight_decay=weight_decay)
+    elif config.optimizer.name == 'ADAM':
+        optimizer = optim.Adam(list(net.parameters()), lr=learning_rate, weight_decay=weight_decay)
+    else:
+        raise ValueError(f"Wrong optimizer_name {config.optimizer.name}")    
+    
+    
+    # lr_schedule = {0: learning_rate*0.1,
+    #                2: learning_rate,
+    #                5: learning_rate * 0.01}
+    lr_schedule = dict()
+    for n_epoch,lr_coef in dict(config.optimizer.lr_schedule).items():
+        lr_schedule[n_epoch] = learning_rate * lr_coef
+    
     lr_scheduler = PresetLRScheduler(lr_schedule)
     best_acc = 0
     best_epoch = 0
     for epoch in range(num_epochs):
-        train(net, trainloader, optimizer, criterion, lr_scheduler, epoch, writer, iteration=iteration)
-        test_acc = test(net, testloader, criterion, epoch, writer, iteration)
+        train(net, trainloader, optimizer, criterion, lr_scheduler, epoch, writer, iteration=iteration, logger=logger)
+        test_acc = test(net, testloader, criterion, epoch, writer, iteration, logger=logger)
         if test_acc > best_acc:
             print('Saving..')
             state = {
                 'net': net,
                 'acc': test_acc,
                 'epoch': epoch,
-                'args': config,
+                'args': config.GraSP,
                 'mask': mb.masks,
                 'ratio': mb.get_ratio_at_each_layer()
             }
-            path = os.path.join(ckpt_path, 'finetune_%s_%s%s_r%s_it%d_best.pth.tar' % (config.dataset,
-                                                                                       config.network,
-                                                                                       config.depth,
-                                                                                       config.target_ratio,
+            path = os.path.join(ckpt_path, 'finetune_%s_%s%s_r%s_it%d_best.pth.tar' % (config.GraSP.dataset,
+                                                                                       config.GraSP.network,
+                                                                                       config.GraSP.depth,
+                                                                                       config.GraSP.target_ratio,
                                                                                        iteration))
             torch.save(state, path)
             best_acc = test_acc
@@ -226,20 +264,73 @@ class MNIST_FC(nn.Module):
         output = self.fc2(x)
         return output
 
-model = MNIST_FC()
+class MNIST_CNN(nn.Module):
+    def __init__(self):
+        super(MNIST_CNN, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=5, padding=2)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=5, padding=2)
+        self.fc1 = nn.Linear(64 * 7 * 7, 1024)
+        self.fc2 = nn.Linear(1024, 10)
 
-def main(config):
+    def forward(self, x):
+        x = self.conv1(x)
+        x = nn.functional.relu(nn.functional.max_pool2d(x, 2))
+        x = self.conv2(x)
+        x = nn.functional.relu(nn.functional.max_pool2d(x, 2))
+        x = x.view(-1, 64 * 7 * 7)
+        x = self.fc1(x)
+        x = nn.functional.dropout(x, training=self.training)
+        x = self.fc2(x)
+        return x
+        # return nn.functional.log_softmax(x, dim=1)
+
+class MNIST_TTM(nn.Module):
+  def __init__(self,tensor_type,max_rank,dropouts=0.3,prior_type='log_uniform',eta=1.0,device=None,dtype=None):
+    super(MNIST_TTM, self).__init__()
+    self.dropout = nn.Dropout(dropouts)
+    # self.shape1 = [[4,7,7,4], [4,8,8,4]]   
+    # self.shape2 = [[4,8,8,4], [1,5,2,1]]  
+    self.shape1 = [[4,7,7,4], [4,4,4,4]]   
+    self.shape2 = [[4,4,4,4], [1,5,2,1]]    
+    self.fc1 = TensorizedLinear_module(784, 256, bias=None, shape=self.shape1, tensor_type=tensor_type, max_rank=max_rank,
+                                prior_type=prior_type, eta=eta, device=device, dtype=dtype)
+    self.fc2 = TensorizedLinear_module(256, 10, bias=None, shape=self.shape2, tensor_type=tensor_type, max_rank=max_rank,
+                                prior_type=prior_type, eta=eta, device=device, dtype=dtype)
+    self.relu = nn.ReLU()
+
+  def forward(self, x):
+    x = torch.flatten(x,1)
+    x = self.fc1(x)
+    x = self.relu(x)
+    x = self.dropout(x)
+    x = self.fc2(x)
+    return x
+  
+# model = MNIST_CNN()
+# model = torch.load('runs/pruning/mnist/MNIST_GraSP_prune_ratio_90/run_None/checkpoint/finetune_mnist_fc2_r0.9_it0_best.pth.tar')
+
+def main():
     # ================== .yml parser ==========================
     # Config: path of *.yml configuration file
     # Currently disabled, and added at front
     
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('config', metavar='FILE', help='config file')
-    # args, opts = parser.parse_known_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-config', metavar='FILE', help='config file')
+    args = parser.parse_args()
 
     # load config *.yml file
     # recursive: also load default.yaml
-    configs.load(opt.config, recursive=False)
+    configs.load(args.config, recursive=False)  
+
+    if configs.GraSP.network == 'fc':
+        model = MNIST_FC()
+    elif configs.GraSP.network == 'ttm':
+        model = MNIST_TTM(
+            tensor_type=configs.model.tensor_type,
+            max_rank = configs.model.max_rank
+        )
+    else:
+        raise ValueError(f"Wrong network_name {configs.GraSP.network}")
 
     # ================== Prepare logger ==========================
     paths = [configs.GraSP.dataset]
@@ -258,6 +349,7 @@ def main(config):
     print("=> config.checkpoint_dir: %s" % configs.GraSP.checkpoint_dir)
 
     logger, writer = init_logger(configs.GraSP)
+    logger.info(dict(configs))
     
     # ====================================== graph and stat ======================================
     # t_batch = next(iter(training_data))
@@ -276,7 +368,7 @@ def main(config):
 
     # preprocessing
     # ====================================== get dataloader ======================================
-    trainloader, testloader = get_dataloader(config.GraSP.dataset, config.batch_size, 256, 4)
+    trainloader, testloader = get_dataloader(configs.GraSP.dataset, configs.GraSP.batch_size, 256, 4)
     
     # ====================================== fetch configs ======================================
     ckpt_path = configs.GraSP.checkpoint_dir
@@ -293,6 +385,12 @@ def main(config):
 
     # ====================================== fetch training schemes ======================================
     ratio = 1 - (1 - target_ratio) ** (1.0 / num_iterations)
+    # learning_rates = str_to_list(config.learning_rate, ',', float)
+    # weight_decays = str_to_list(config.weight_decay, ',', float)
+    # training_epochs = str_to_list(config.epoch, ',', int)
+    learning_rates = float(configs.GraSP.learning_rate)
+    weight_decays = float(configs.GraSP.weight_decay)
+    training_epochs = int(configs.GraSP.epoch)
     logger.info('Normalize: %s, Total iteration: %d, Target ratio: %.2f, Iter ratio %.4f.' %
                 (normalize, num_iterations, target_ratio, ratio))
 
@@ -308,10 +406,10 @@ def main(config):
         print("=> Applying weight initialization(%s)." % configs.GraSP.get('init_method', 'kaiming'))
         print("Iteration of: %d/%d" % (iteration, num_iterations))
 
-        masks = GraSP(mb.model, ratio, trainloader, 'cuda',
-                      num_classes=classes[config.dataset],
-                      samples_per_class=config.samples_per_class,
-                      num_iters=config.get('num_iters', 1))
+        masks, named_masks = GraSP_zo_mask(mb.model, ratio, trainloader, 'cuda',
+                      num_classes=configs.GraSP.num_classes,
+                      samples_per_class=configs.GraSP.samples_per_class,
+                      num_iters=configs.GraSP.num_iters)
         iteration = 0
         print('=> Using GraSP')
         # ========== register mask ==================
@@ -342,18 +440,23 @@ def main(config):
         # ========== finetuning =======================
         train_once(mb=mb,
                    net=mb.model,
+                   named_masks = named_masks,
                    trainloader=trainloader,
                    testloader=testloader,
                    writer=writer,
-                   config=config,
+                   config=configs,
                    ckpt_path=ckpt_path,
-                   learning_rate=learning_rates[iteration],
-                   weight_decay=weight_decays[iteration],
-                   num_epochs=training_epochs[iteration],
+                  #  learning_rate=learning_rates[iteration],
+                  #  weight_decay=weight_decays[iteration],
+                  #  num_epochs=training_epochs[iteration],
+                   learning_rate=learning_rates,
+                   weight_decay=weight_decays,
+                   num_epochs=training_epochs,
                    iteration=iteration,
                    logger=logger)
 
 
 if __name__ == '__main__':
-    config = init_config()
-    main(config)
+    main()
+    # config = init_config()
+    # main(config)

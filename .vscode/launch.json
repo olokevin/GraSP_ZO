@@ -17,6 +17,18 @@
                "-save_mode", "best", "-proj_share_weight", "-label_smoothing", "-batch_size","32", "-epoch", "500",
                "-config", "configs/ATIS/GraSP_90.yml"],
       "justMyCode": true
+    },
+    {
+      "name": "${workspace}/main_prune_MNIST.py",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "env": {
+        "CUDA_VISIBLE_DEVICES": "2"
+      },
+      "args": ["-config", "configs/MNIST/FC/SCD.yml"],
+      "justMyCode": true
     }
   ]
 }

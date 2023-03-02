@@ -1,0 +1,19 @@
+=> config.summary_dir:    ./runs/pruning/mnist/MNIST_fc_90_inc/run_None/summary/
+=> config.checkpoint_dir: ./runs/pruning/mnist/MNIST_fc_90_inc/run_None/checkpoint/
+=> Applying weight initialization(kaiming).
+Iteration of: 0/1
+(1): Iterations 0/1.
+(2): Iterations 0/1.
+(2): Iterations 1/1.
+** norm factor: tensor(0.0008, device='cuda:0')
+** accept:  tensor(-2.4227e-05, device='cuda:0')
+tensor(20328, device='cuda:0')
+=> Using GraSP
+{'fc1': {'weight': tensor([     1,      2,      4,  ..., 200604, 200609, 200634], device='cuda:0')}, 'fc2': {'weight': tensor([   0,    2,    4,  ..., 2556, 2558, 2559], device='cuda:0')}}
+=> Using a preset learning rate schedule:
+{0: 0.01, 5: 0.001, 7: 0.0001}
+
+Epoch: 0
+Saving..
+
+Epoch: 1

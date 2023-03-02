@@ -18,10 +18,13 @@ class ZO_SGD_mask(Optimizer):
     def __init__(
         self,
         model: nn.Module,
-        criterion: Callable = None,
-        lr: float = 2,
+        criterion: Callable,
+        masks,
+        lr: float = 0.01,
         sigma: float = 0.1,
-        n_sample: int = 20
+        n_sample: int = 20,
+        signSGD: bool = False,
+        tensorized: bool = False
     ):
         defaults = dict(lr=lr)
         super().__init__(model.parameters(), defaults)
@@ -31,6 +34,9 @@ class ZO_SGD_mask(Optimizer):
         self.global_step = 0
         self.model = model
         self.criterion = criterion
+        self.masks = masks
+        self.signSGD = signSGD
+        self.tensorized = tensorized
         self.init_state()
 
     def init_state(self):
@@ -43,33 +49,40 @@ class ZO_SGD_mask(Optimizer):
         # self.untrainable_params = self.extract_untrainable_parameters(self.model)
 
     def extract_modules(self, model):
-        return {
-            layer_name: layer
-            for layer_name, layer in model.named_modules()
-            if isinstance(layer, (TensorizedLinear_module))
-        }
-
-    # def extract_trainable_parameters(self, model):
-    #     # always flatten the parameters
-    #     return {
-    #         layer_name: {
-    #             param_name: getattr(layer, param_name).view(-1)
-    #             for param_name in ["phase_U", "phase_S", "phase_V"]
-    #         }
-    #         for layer_name, layer in model.named_modules()
-    #         if isinstance(layer, (TensorizedLinear_module))
-    #     }
+        if self.tensorized == True:
+            return {
+                layer_name: layer
+                for layer_name, layer in model.named_modules()
+                if isinstance(layer, (TensorizedLinear_module))
+            }
+        else:
+            return {
+                layer_name: layer
+                for layer_name, layer in model.named_modules()
+                if isinstance(layer, (nn.Linear, nn.Conv2d))
+            }
 
     def extract_trainable_parameters(self, model):
     # always flatten the parameters
-        return {
-            layer_name: {
-                "tt_cores-"+str(i): getattr(layer,'tt_cores')[i].weight.view(-1)
-                for i in range(getattr(layer, 'order'))
+        if self.tensorized == True:
+            return {
+                layer_name: {
+                    "tt_cores-"+str(i): getattr(layer,'tt_cores')[i].weight.view(-1)
+                    for i in range(getattr(layer, 'order'))
+                }
+                for layer_name, layer in model.named_modules()
+                if isinstance(layer, (nn.Linear, nn.Conv2d, TensorizedLinear_module))
             }
-            for layer_name, layer in model.named_modules()
-            if isinstance(layer, (TensorizedLinear_module))
-        }
+        else:
+            return {
+                layer_name: {
+                param_name: getattr(layer, param_name)    
+                # param_name: getattr(layer, param_name).view(-1)
+                    for param_name in ["weight"]
+                }
+                for layer_name, layer in model.named_modules()
+                if isinstance(layer, (nn.Linear, nn.Conv2d))
+            }
 
     # def extract_untrainable_parameters(self, model):
     #     return {
@@ -89,7 +102,7 @@ class ZO_SGD_mask(Optimizer):
     # params: trainable_params -> {layer_name: {p_name, p}}
     def perturb(self, params, sigma):
         perturbs = {
-            layer_name: {p_name: self._sample_perturbation(p, sigma) for p_name, p in layer_params.items()}
+            layer_name: {p_name: self._sample_perturbation(p, sigma).mul(self.masks[layer_name][p_name]) for p_name, p in layer_params.items()}
             for layer_name, layer_params in params.items()
         }
         # p_name: phase_U phase_S phase_V
@@ -105,48 +118,14 @@ class ZO_SGD_mask(Optimizer):
     def commit(self, params) -> None:
         # layer = self.modules[layer_name]
         for layer_name, layer in self.modules.items():
-            for p_name, p in params[layer_name].items():   # params[layer_name].items(): {p_name, p}
-                name_list = p_name.split('-')
+            for param_name, param in params[layer_name].items():   # params[layer_name].items(): {p_name, p}
+                if param_name == 'weight':
+                    layer.weight.data = param
+                    # layer.weight.data = param.reshape(layer.out_features, layer.in_features)
+                else:
+                    raise ValueError(f"Wrong param_name {param_name}")
+                    # name_list = p_name.split('-')
                 
-                
-                
-    
-    # def commit(self, params) -> None:
-    #     # layer = self.modules[layer_name]
-    #     for layer_name, layer in self.modules.items():
-    #         for param_name, phases in params[layer_name].items():
-    #             if param_name == "phase_U":
-    #                 phase_bias = self.untrainable_params[layer_name]["phase_bias_U"]
-    #                 delta_list = self.untrainable_params[layer_name]["delta_list_U"]
-    #                 quantizer = self.quantizers[layer_name]["phase_U_quantizer"]
-    #                 layer.U.data.copy_(
-    #                     self.decomposer.reconstruct(
-    #                         delta_list,
-    #                         self.v2m(
-    #                             quantizer(phases.view(phase_bias.size(0), phase_bias.size(1), -1))
-    #                             + phase_bias
-    #                         ),
-    #                     )
-    #                 )
-    #             elif param_name == "phase_V":
-    #                 phase_bias = self.untrainable_params[layer_name]["phase_bias_V"]
-    #                 delta_list = self.untrainable_params[layer_name]["delta_list_V"]
-    #                 quantizer = self.quantizers[layer_name]["phase_V_quantizer"]
-
-    #                 layer.V.data.copy_(
-    #                     self.decomposer.reconstruct(
-    #                         delta_list,
-    #                         self.v2m(
-    #                             quantizer(phases.view(phase_bias.size(0), phase_bias.size(1), -1))
-    #                             + phase_bias
-    #                         ),
-    #                     )
-    #                 )
-
-    #             elif param_name == "phase_S":
-    #                 layer.S.data.copy_(phases.data.cos().view_as(layer.S).mul_(layer.S_scale))
-    #             else:
-    #                 raise ValueError(f"Wrong param_name {param_name}")
 
     def _compute_gradient(self, loss_diff, perturb, sigma):
         c = 1 / sigma ** 2
@@ -165,10 +144,16 @@ class ZO_SGD_mask(Optimizer):
         }
 
     def _apply_gradients(self, params, grad, lr):
-        return {
-            layer_name: {p_name: p.sub_(grad[layer_name][p_name] * lr) for p_name, p in layer_params.items()}
-            for layer_name, layer_params in params.items()
-        }
+        if self.signSGD == True:
+            return {
+                layer_name: {p_name: p.sub_(torch.sign(grad[layer_name][p_name]) * lr) for p_name, p in layer_params.items()}
+                for layer_name, layer_params in params.items()
+            }
+        else:
+            return {
+                layer_name: {p_name: p.sub_(grad[layer_name][p_name] * lr) for p_name, p in layer_params.items()}
+                for layer_name, layer_params in params.items()
+            }
 
     def zo_gradient_descent(self, obj_fn, params):
         """
@@ -183,7 +168,7 @@ class ZO_SGD_mask(Optimizer):
         for _ in range(self.n_sample):
             perturb, perturbed_params = self.perturb(params, self.sigma)
             with torch.no_grad():  # training=True to enable profiling, but do not save graph
-                # self.commit(perturbed_params)
+                self.commit(perturbed_params)
                 _, new_loss = obj_fn()
                 self.forward_counter += 1
             grad = self._compute_gradient(new_loss - old_loss, perturb, self.sigma)

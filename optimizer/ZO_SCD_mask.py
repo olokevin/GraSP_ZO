@@ -31,7 +31,8 @@ class ZO_SCD_mask(Optimizer):
         criterion: Callable,
         masks,
         lr: float = 0.1,
-        grad_sparsity: float = 0.1
+        grad_sparsity: float = 0.1,
+        tensorized: bool = False
     ):
         defaults = dict(lr=lr)
         super().__init__(model.parameters(), defaults)
@@ -40,6 +41,8 @@ class ZO_SCD_mask(Optimizer):
         self.model = model
         self.criterion = criterion
         self.masks = masks
+        self.grad_sparsity = grad_sparsity
+        self.tensorized = tensorized
         self.init_state()
 
     def init_state(self):
@@ -99,32 +102,13 @@ class ZO_SCD_mask(Optimizer):
             for layer_name, layer_params in self.trainable_params.items()
         }
 
-    def commit(self, layer_name: str, param_name: str, phases: Tensor) -> None:
+    def commit(self, layer_name: str, param_name: str, param: Tensor) -> None:
+        '''
+            layer_name:{param_name: p}
+        '''
         layer = self.modules[layer_name]
-        if param_name == "phase_U":
-            phase_bias = self.untrainable_params[layer_name]["phase_bias_U"]
-            delta_list = self.untrainable_params[layer_name]["delta_list_U"]
-            quantizer = self.quantizers[layer_name]["phase_U_quantizer"]
-            layer.U.data.copy_(
-                self.decomposer.reconstruct(
-                    delta_list,
-                    self.v2m(quantizer(phases.view(phase_bias.size(0), phase_bias.size(1), -1)) + phase_bias),
-                )
-            )
-        elif param_name == "phase_V":
-            phase_bias = self.untrainable_params[layer_name]["phase_bias_V"]
-            delta_list = self.untrainable_params[layer_name]["delta_list_V"]
-            quantizer = self.quantizers[layer_name]["phase_V_quantizer"]
-
-            layer.V.data.copy_(
-                self.decomposer.reconstruct(
-                    delta_list,
-                    self.v2m(quantizer(phases.view(phase_bias.size(0), phase_bias.size(1), -1)) + phase_bias),
-                )
-            )
-
-        elif param_name == "phase_S":
-            layer.S.data.copy_(phases.data.cos().view_as(layer.S).mul_(layer.S_scale))
+        if param_name == "weight":
+            layer.weight.data = param.reshape(layer.out_features, layer.in_features)
         else:
             raise ValueError(f"Wrong param_name {param_name}")
 
