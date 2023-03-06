@@ -535,9 +535,12 @@ def main():
     par = list(transformer.parameters())
     # for p in par:
     #     p.requires_grad = True
-    lr = 1e-3
+    
+    # lr = 1e-3
 
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+    optimizers = build_optimizer(configs, model, criterion, named_masks, learning_rates, weight_decays)
+    lr_schedulers = build_scheduler(configs, optimizers, learning_rates)
 
     # ===================== Zi Yang's optimzier setting =====================
     
@@ -563,15 +566,12 @@ def main():
             
     #         transformer.requires_grad_(False)
     #         optimizer_ZO = None
-
-    optimizers = build_optimizer(configs, model, criterion, named_masks, learning_rate, weight_decay)
-    lr_schedulers = build_scheduler(configs, optimizers, learning_rate)
-
     
     valid_acc_all = [-1]
     train_result = []
     test_result = []
     for epoch in range(training_epochs):
+        # ========================== Setup Optimizer ==========================
         # mix training selection
         if configs.optimizer.name == 'ZO_mix':
             if epoch < configs.optimizer.switch_epoch:
@@ -587,15 +587,23 @@ def main():
         
         start = time.time()
 
-        lr_scheduler(optimizer, epochs)
-        train_loss, train_accu, train_slot_accu = train_epoch_bylayer(transformer,training_data,Loss=criterion,optimizer=optimizer,precondition=precondition,device=device,tensor_blocks=tensor_blocks,step=epoch)
+        # ========================== Training ==========================
+        if isinstance(lr_scheduler, PresetLRScheduler):
+            lr_scheduler(optimizer, epoch)
+            now_lr = lr_scheduler.get_lr(optimizer)
+        else:
+            now_lr = optimizer.state_dict()['param_groups'][0]['lr']
+        
+        train_loss, train_accu, train_slot_accu = train_epoch_bylayer(transformer,training_data,Loss=criterion,optimizer=optimizer,lr_scheduler=lr_scheduler,precondition=precondition,device=device,tensor_blocks=tensor_blocks,step=epoch)
 
         # train_loss, train_accu = 0,0
 
         start_val = time.time()
 
+        # ========================== Validation ==========================
         valid_loss, valid_accu, valid_slot_accu = eval_epoch(transformer, validation_data, device, weight=None)
 
+        # ========================== Test ==========================
         test_loss, test_accu, test_slot_accu = eval_epoch(transformer, test_data, device, weight=None)
         # train_loss_new, train_accu = eval_epoch(transformer, training_data, device, weight=None)
         train_result += [train_loss.cpu().to(torch.float32),train_accu.cpu().to(torch.float32),train_slot_accu.cpu().to(torch.float32)]
@@ -635,16 +643,7 @@ def main():
     PATH_np = opt.save_model + '.npy'
     np.save(PATH_np,np.array([train_result,test_result]))
 
-# ================== fetch training schemes ==================
-def build_obj_fn(self, data, target, model, criterion):
-        def _obj_fn():
-            y = model(data)
-            return y, criterion(y, target)
-
-        return _obj_fn
-
-
-def train_epoch_bylayer(model, training_data, Loss, optimizer, tensor_blocks=None,precondition=False,device='cuda',step=1):
+def train_epoch_bylayer(model, training_data, Loss, optimizer, lr_scheduler, tensor_blocks=None,precondition=False,device='cuda',step=1):
     ''' Epoch operation in training phase'''
 
     model.train()
@@ -675,37 +674,42 @@ def train_epoch_bylayer(model, training_data, Loss, optimizer, tensor_blocks=Non
 
         # attn = None
         # model.eval()
-        pred,pred_slot = model(w1,attn=attn,seg=seg)
-        # pred_2,pred_slot_2 = model(w1,attn=attn,seg=seg)
-
-        # print('diff=',torch.max(pred-pred_2))
-
-        pred_slot = torch.flatten(pred_slot,start_dim=0, end_dim=1)
-
-        slot_label = torch.flatten(slot_label,start_dim=0, end_dim=1)
-
-        loss_MLM =  Loss(pred_slot, slot_label)
-        loss = Loss(pred,target)  + loss_MLM
-
+        
         memory = torch.cuda.max_memory_allocated()/1024/1024/1024
         max_memory = max(max_memory,memory)
+
+        inputs = (w1, attn, seg)
+        targets = (target, slot_label)
 
         if isinstance(optimizer, ZO_SCD_mask):
             outputs, loss = optimizer.step(inputs, targets)
         elif isinstance(optimizer, ZO_SGD_mask):
-            outputs, loss, grads_e = optimizer.step(inputs, targets)
+            outputs, loss, grads_e = optimizer.step(inputs, targets, ATIS=True)
             # test, check real grads
             if configs.optimizer.debug == True:
-                test_optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
-                outputs = net(inputs)
-                loss = criterion(outputs, targets)
+                test_optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+                
+                pred,pred_slot = model(w1,attn=attn,seg=seg)
+                pred_slot = torch.flatten(pred_slot,start_dim=0, end_dim=1)
+                slot_label = torch.flatten(slot_label,start_dim=0, end_dim=1)
+
+                loss_MLM =  Loss(pred_slot, slot_label)
+                loss = Loss(pred,target)  + loss_MLM
+
+                loss = Loss(outputs, targets)
                 loss.backward()
                 test_optimizer.step()
         else:
-            outputs = net(inputs)
-            loss = criterion(outputs, targets)
+            pred,pred_slot = model(w1,attn=attn,seg=seg)
+            pred_slot = torch.flatten(pred_slot,start_dim=0, end_dim=1)
+            slot_label = torch.flatten(slot_label,start_dim=0, end_dim=1)
+
+            loss_MLM =  Loss(pred_slot, slot_label)
+            loss = Loss(pred,target)  + loss_MLM
+
             loss.backward()
             optimizer.step()
+
             
         # print('ZO=',model.encoder.layer_stack[-1].slf_attn.w_ks.tensor.factors[2].grad[1,:10,1])
 
@@ -737,27 +741,7 @@ def train_epoch_bylayer(model, training_data, Loss, optimizer, tensor_blocks=Non
                     right = torch.flatten(torch.tensordot(V,right,[[-1],[0]]),start_dim=1,end_dim=-1)
                     
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-
-
-        # update parameters
-        # print(model.encoder.layer_stack[0].slf_attn.w_ks.tensor.factors[0])
-        ####gradient based optimizer        
-        optimizer.step()
-        if optimizer_tensor!=None:
-            optimizer_tensor.step()
-        # print(model.encoder.layer_stack[0].slf_attn.w_ks.tensor.factors[0])
-        # print(model.encoder.layer_stack[0].slf_attn.w_ks.tensor.factors[0].grad)
         
-        # break
-        # print(model.encoder.layer_stack[0].slf_attn.w_ks.scale_med.grad)
-        # print(model.encoder.layer_stack[0].slf_attn.w_ks.tensor.factors[0].grad)
-
-
-        #ZO order optimizer
-        # print(loss)
-        # optimizer.step((w1,attn,seg),(target,slot_label))
-        
- 
 
         # note keeping
         total_loss += loss.detach()

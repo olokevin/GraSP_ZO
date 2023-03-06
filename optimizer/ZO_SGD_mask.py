@@ -354,9 +354,33 @@ class ZO_SGD_mask(Optimizer):
             return y, criterion(y, target)
 
         return _obj_fn
+    
+    def build_obj_fn_ATIS(self, datas, targets, model, criterion):
+        def _obj_fn():
+            # optimizer.step((w1,attn,seg),(target,slot_label))
+            w1 = datas[0]
+            attn = datas[1]
+            seg = datas[2]
 
-    def step(self, data, target):
-        self.obj_fn = self.build_obj_fn(data, target, self.model, self.criterion)
+            target = targets[0]
+            slot_label = targets[1]
+
+            pred,pred_slot = model(w1,attn=attn,seg=seg)
+
+            pred_slot = torch.flatten(pred_slot,start_dim=0, end_dim=1)
+            slot_label = torch.flatten(slot_label,start_dim=0, end_dim=1)
+
+            loss_MLM =  criterion(pred_slot, slot_label)
+            loss = criterion(pred,target)  + loss_MLM
+            
+            return (pred, pred_slot), loss
+        return _obj_fn
+
+    def step(self, data, target, ATIS=False):
+        if ATIS == True:
+            self.obj_fn = self.build_obj_fn_ATIS(data, target, self.model, self.criterion)
+        else:
+            self.obj_fn = self.build_obj_fn(data, target, self.model, self.criterion)
         
         if self.layer_by_layer == False:
             y, loss, grads = self.zo_gradient_descent_all(self.obj_fn, self.trainable_params)
