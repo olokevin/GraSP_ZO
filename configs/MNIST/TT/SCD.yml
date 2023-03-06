@@ -1,16 +1,16 @@
 GraSP:
-  exp_name: "MNIST_ttm_FO_adam"
-  network: ttm
+  exp_name: "MNIST_tt_none_scd"
+  network: tt
   depth: 2
   dataset: mnist
   batch_size: 128
-  epoch: 20
-  learning_rate: 0.01
+  epoch: 30
+  learning_rate: 0.001
   weight_decay: 1e-4
   exception: -1
   iterations: 1
   normalize: false
-  target_ratio: 0.9
+  target_ratio: 0.99
   pruner: False
   pruner_file: False
   num_classes: 10
@@ -19,14 +19,11 @@ GraSP:
   num_iters: 1
 
 optimizer:
-  name: ADAM
-
-scheduler:
-  name: 'PresetLRScheduler'
-  gamma: 0.985
+  name: ZO_SCD_mask
+  grad_sparsity: 0.5
   lr_schedule: {0: 1,
-                10: 0.1,
-                20: 0.01}
+                5: 0.1,
+                15: 0.01}
 
 run:
   runs: None
@@ -39,12 +36,12 @@ run:
   train_noise: 0
 
 model:
-  tensor_type: 'TensorTrainMatrix'
-  max_rank: 4
-  tensorized: 'TensorizedLinear_module'
+  tensorized: 'TensorizedLinear'
+  rank: 0.1
+  dropouts: 0.1
 
 checkpoint:
-  save_model: "model/MNIST_notensor_2layers_FP32"
+  save_model: "model/MNIST_notensor_SCD"
   save_mode: "best"
   proj_share_weight: 1
   label_smoothing: 1

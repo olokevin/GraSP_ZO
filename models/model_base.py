@@ -17,24 +17,27 @@ class ModelBase(object):
             # self.model = get_network(network, depth, dataset)
 
     def get_ratio_at_each_layer(self):
-        assert self.masks is not None, 'Masks should be generated first.'
-        res = dict()
-        total = 0
-        remained = 0
-        # for m in self.masks.keys():
-        for m in self.model.modules():
-            if isinstance(m, (nn.Linear, nn.Conv2d)):
-                mask = self.masks.get(m, None)
-                if mask is not None:
-                    res[m] = (mask.sum() / mask.numel()).item() * 100
-                    total += mask.numel()
-                    remained += mask.sum().item()
-                else:
-                    res[m] = -100.0
-                    total += m.weight.numel()
-                    remained += m.weight.numel()
-        res['ratio'] = remained/total * 100
-        return res
+        # assert self.masks is not None, 'Masks should be generated first.'
+        if self.masks is None:
+            return 'Not masked'
+        else:
+            res = dict()
+            total = 0
+            remained = 0
+            # for m in self.masks.keys():
+            for m in self.model.modules():
+                if isinstance(m, (nn.Linear, nn.Conv2d)):
+                    mask = self.masks.get(m, None)
+                    if mask is not None:
+                        res[m] = (mask.sum() / mask.numel()).item() * 100
+                        total += mask.numel()
+                        remained += mask.sum().item()
+                    else:
+                        res[m] = -100.0
+                        total += m.weight.numel()
+                        remained += m.weight.numel()
+            res['ratio'] = remained/total * 100
+            return res
 
     def get_unmasked_weights(self):
         """Return the weights that are unmasked.

@@ -268,6 +268,12 @@ def GraSP_attn(net, ratio, sample_dataloader, device, num_iters=1, T=200, reinit
         if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear):
             grads[old_modules[idx]] = -layer.weight.data * layer.weight.grad  # -theta_q Hg
 
+    # =============== for ZO optimizer ===============
+    named_grads = dict()
+    for layer_name, layer in net.named_modules():
+        if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear):
+            named_grads[layer_name] = -layer.weight.data * layer.weight.grad  # -theta_q Hg
+    
     # Gather all scores in a single vector and normalise
     all_scores = torch.cat([torch.flatten(x) for x in grads.values()])
     norm_factor = torch.abs(torch.sum(all_scores)) + eps
@@ -283,6 +289,11 @@ def GraSP_attn(net, ratio, sample_dataloader, device, num_iters=1, T=200, reinit
     for m, g in grads.items():
         keep_masks[m] = ((g / norm_factor) <= acceptable_score).float()
 
+    # =============== for ZO optimizer ===============
+    named_keep_masks = dict()
+    for m, g in named_grads.items():
+        named_keep_masks[m] = {'weight': ((g / norm_factor) <= acceptable_score).float()}
+    
     print(torch.sum(torch.cat([torch.flatten(x == 1) for x in keep_masks.values()])))
 
-    return keep_masks
+    return keep_masks, named_keep_masks

@@ -1,33 +1,31 @@
 GraSP:
-  exp_name: "MNIST_fc_99_scd"
-  network: fc
+  exp_name: "ATIS_GraSP95_SCD"
+  network: attn
   depth: 2
-  dataset: mnist
+  dataset: ATIS
   batch_size: 128
-  epoch: 20
-  learning_rate: 0.01
+  epoch: 160
+  learning_rate: 0.1
   weight_decay: 1e-4
   exception: -1
   iterations: 1
   normalize: false
-  target_ratio: 0.99
+  target_ratio: 0.95
   pruner: GraSP
   pruner_file: GraSP
-  num_classes: 10
+  num_classes: 21
   samples_per_class: 10
   samples_batches: 5
   num_iters: 1
 
 optimizer:
-  name: ZO_SCD_mask
-  grad_sparsity: 0.5
+  name: adamw
+  lr: 0.002
+  weight_decay: 0.01
 
 scheduler:
-  name: 'PresetLRScheduler'
-  gamma: 0.985
-  lr_schedule: {0: 1,
-                10: 0.1,
-                20: 0.01}
+  name: cosine
+  lr_min: 0.00002
 
 run:
   runs: None
@@ -45,7 +43,7 @@ model:
   precondition: 0
 
 checkpoint:
-  save_model: "model/MNIST_notensor_SCD"
+  save_model: "model/ATIS_notensor_2layers_FP32/GraSP_95"
   save_mode: "best"
   proj_share_weight: 1
   label_smoothing: 1

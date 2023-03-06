@@ -1,18 +1,18 @@
 GraSP:
-  exp_name: "MNIST_ttm_90_scd"
+  exp_name: "MNIST_ttm_scd"
   network: ttm
   depth: 2
   dataset: mnist
   batch_size: 128
-  epoch: 20
-  learning_rate: 0.01
+  epoch: 25
+  learning_rate: 0.001
   weight_decay: 1e-4
   exception: -1
   iterations: 1
   normalize: false
   target_ratio: 0.90
-  pruner: GraSP
-  pruner_file: GraSP
+  pruner: False
+  pruner_file: False
   num_classes: 10
   samples_per_class: 10
   samples_batches: 5
@@ -21,9 +21,13 @@ GraSP:
 optimizer:
   name: ZO_SCD_mask
   grad_sparsity: 0.5
+
+scheduler:
+  name: 'PresetLRScheduler'
+  gamma: 0.985
   lr_schedule: {0: 1,
-                5: 0.1,
-                15: 0.01}
+                10: 0.1,
+                20: 0.01}
 
 run:
   runs: None
@@ -37,8 +41,8 @@ run:
 
 model:
   tensor_type: 'TensorTrainMatrix'
-  max_rank: 4
-  tensorized: 1
+  max_rank: 8
+  tensorized: 'TensorizedLinear_module'
 
 checkpoint:
   save_model: "model/MNIST_notensor_SCD"

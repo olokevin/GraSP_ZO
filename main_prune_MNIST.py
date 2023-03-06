@@ -13,13 +13,17 @@ from utils.init_utils import weights_init
 from utils.common_utils import (get_logger, makedirs, process_config, PresetLRScheduler, str_to_list)
 from utils.data_utils import get_dataloader
 from utils.network_utils import get_network
+from utils.builder import build_optimizer, build_scheduler
 from models.model_base import ModelBase
 from pruner.GraSP_zo_mask import GraSP_zo_mask
 
 from pyutils.config import configs
 from optimizer import ZO_SCD_mask, ZO_SGD_mask
 
-from tensor_layers.layers import TensorizedLinear_module
+# from tensor_layers.layers import TensorizedLinear_module
+# from tensor_fwd_bwd.tensorized_linear import TensorizedLinear
+
+from models.tensor_models import MNIST_FC, MNIST_CNN, MNIST_TTM, MNIST_TT
 
 # disabled
 def init_config():
@@ -52,6 +56,10 @@ def init_logger(config):
     # sys.stderr = open(os.path.join(config.summary_dir, 'stderr.txt'), 'w+')
     return logger, writer
 
+def get_parameter_number(model):
+    total_num = sum(p.numel() for p in model.parameters())
+    trainable_num = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    return {'Total': total_num, 'Trainable': trainable_num}
 
 def print_mask_information(mb, logger):
     ratios = mb.get_ratio_at_each_layer()
@@ -93,11 +101,17 @@ def train(net, loader, optimizer, criterion, lr_scheduler, epoch, writer, iterat
     correct = 0
     total = 0
 
-    lr_scheduler(optimizer, epoch)
-    desc = ('[LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)' %
-            (lr_scheduler.get_lr(optimizer), 0, 0, correct, total))
+    if isinstance(lr_scheduler, PresetLRScheduler):
+        lr_scheduler(optimizer, epoch)
+        now_lr = lr_scheduler.get_lr(optimizer)
+    else:
+        now_lr = optimizer.state_dict()['param_groups'][0]['lr']
 
-    writer.add_scalar('iter_%d/train/lr' % iteration, lr_scheduler.get_lr(optimizer), epoch)
+    
+    desc = ('[LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)' %
+            (now_lr, 0, 0, correct, total))
+
+    writer.add_scalar('iter_%d/train/lr' % iteration, now_lr, epoch)
 
     prog_bar = tqdm(enumerate(loader), total=len(loader), desc=desc, leave=True)
     for batch_idx, (inputs, targets) in prog_bar:
@@ -107,8 +121,17 @@ def train(net, loader, optimizer, criterion, lr_scheduler, epoch, writer, iterat
         # loss = criterion(outputs, targets)
         # loss.backward()
 
-        if isinstance(optimizer, (ZO_SCD_mask, ZO_SGD_mask)):
+        if isinstance(optimizer, ZO_SCD_mask):
             outputs, loss = optimizer.step(inputs, targets)
+        elif isinstance(optimizer, ZO_SGD_mask):
+            outputs, loss, grads_e = optimizer.step(inputs, targets)
+            # test, check real grads
+            if configs.optimizer.debug == True:
+                test_optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+                outputs = net(inputs)
+                loss = criterion(outputs, targets)
+                loss.backward()
+                test_optimizer.step()
         else:
             outputs = net(inputs)
             loss = criterion(outputs, targets)
@@ -121,7 +144,7 @@ def train(net, loader, optimizer, criterion, lr_scheduler, epoch, writer, iterat
         correct += predicted.eq(targets).sum().item()
 
         desc = ('[LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)' %
-                (lr_scheduler.get_lr(optimizer), train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+                (now_lr, train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
         prog_bar.set_description(desc, refresh=True)
 
         # logger.info('epoch[%d], batch_idx[%d], train_loss acc: %.4f' % (epoch, batch_idx, train_loss))
@@ -129,7 +152,7 @@ def train(net, loader, optimizer, criterion, lr_scheduler, epoch, writer, iterat
     train_loss = train_loss / (batch_idx + 1)
     train_acc  = 100. * correct / total
         
-    logger.info('epoch[%d], lr: %.4f, train_loss: %.4f, train_acc: %.4f' % (epoch, lr_scheduler.get_lr(optimizer), train_loss, train_acc))
+    logger.info('epoch[%d], lr: %.4f, train_loss: %.4f, train_acc: %.4f' % (epoch, now_lr, train_loss, train_acc))
         
     writer.add_scalar('iter_%d/train/loss' % iteration, train_loss, epoch)
     writer.add_scalar('iter_%d/train/acc' % iteration, train_acc, epoch)
@@ -172,50 +195,116 @@ def test(net, loader, criterion, epoch, writer, iteration, logger):
 
 def train_once(mb, net, named_masks, trainloader, testloader, writer, config, ckpt_path, learning_rate, weight_decay, num_epochs,
                iteration, logger):
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(reduction='mean')
     
-    if config.optimizer.name == 'ZO_SCD_mask':
-        net.requires_grad_(False)
-        optimizer = ZO_SCD_mask(
-            model = net, 
-            criterion = criterion,
-            masks = named_masks,
-            lr = learning_rate,
-            grad_sparsity = config.optimizer.grad_sparsity
-        )
-    elif config.optimizer.name == 'ZO_SGD_mask':
-        net.requires_grad_(False)
-        optimizer = ZO_SGD_mask(
-            model = net, 
-            criterion = criterion,
-            masks = named_masks,
-            lr = learning_rate,
-            sigma = config.optimizer.sigma,
-            n_sample  = config.optimizer.n_sample,
-            signSGD = config.optimizer.signSGD,
-            tensorized = False
-        )
-    elif config.optimizer.name == 'SGD':
-        optimizer = optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9, weight_decay=weight_decay)
-    elif config.optimizer.name == 'ADAM':
-        optimizer = optim.Adam(list(net.parameters()), lr=learning_rate, weight_decay=weight_decay)
-    else:
-        raise ValueError(f"Wrong optimizer_name {config.optimizer.name}")    
+    # ================== optimizer ======================
+    optimizers = build_optimizer(config, net, criterion, named_masks, learning_rate, weight_decay)
+    # if config.optimizer.name == 'ZO_SCD_mask':
+    #     net.requires_grad_(False)
+    #     optimizer = ZO_SCD_mask(
+    #         model = net, 
+    #         criterion = criterion,
+    #         masks = named_masks,
+    #         lr = learning_rate,
+    #         grad_sparsity = config.optimizer.grad_sparsity,
+    #         tensorized = config.model.tensorized
+    #     )
+    # elif config.optimizer.name == 'ZO_SGD_mask':
+    #     if config.optimizer.debug == True:
+    #         net.requires_grad_(True)
+    #     else:
+    #         net.requires_grad_(False)
+    #     optimizer = ZO_SGD_mask(
+    #         model = net, 
+    #         criterion = criterion,
+    #         masks = named_masks,
+    #         lr = learning_rate,
+    #         sigma = config.optimizer.sigma,
+    #         n_sample  = config.optimizer.n_sample,
+    #         signSGD = config.optimizer.signSGD,
+    #         layer_by_layer = config.optimizer.layer_by_layer,
+    #         tensorized = config.model.tensorized
+    #     )
+    # elif config.optimizer.name == 'ZO_mix':
+    #     optimizer_SGD = ZO_SGD_mask(
+    #         model = net, 
+    #         criterion = criterion,
+    #         masks = named_masks,
+    #         lr = learning_rate,
+    #         sigma = config.optimizer.sigma,
+    #         n_sample  = config.optimizer.n_sample,
+    #         signSGD = config.optimizer.signSGD,
+    #         layer_by_layer = config.optimizer.layer_by_layer,
+    #         tensorized = config.model.tensorized
+    #     )
+    #     optimizer_SCD = ZO_SCD_mask(
+    #         model = net, 
+    #         criterion = criterion,
+    #         masks = named_masks,
+    #         lr = config.optimizer.SCD_lr,
+    #         grad_sparsity = config.optimizer.grad_sparsity,
+    #         tensorized = config.model.tensorized
+    #     )
+    #     optimizer = optimizer_SGD
+    # elif config.optimizer.name == 'SGD':
+    #     optimizer = optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9, weight_decay=weight_decay)
+    # elif config.optimizer.name == 'ADAM':
+    #     # optimizer = optim.Adam(list(net.parameters()), lr=learning_rate, weight_decay=weight_decay)
+    #     optimizer = optim.Adam(net.parameters(), betas=(0.9, 0.98), eps=1e-06, lr = learning_rate)
+    # else:
+    #     raise ValueError(f"Wrong optimizer_name {config.optimizer.name}")    
     
+    # ================== scheduler ======================
     
-    # lr_schedule = {0: learning_rate*0.1,
-    #                2: learning_rate,
-    #                5: learning_rate * 0.01}
-    lr_schedule = dict()
-    for n_epoch,lr_coef in dict(config.optimizer.lr_schedule).items():
-        lr_schedule[n_epoch] = learning_rate * lr_coef
+    lr_schedulers = build_scheduler(config, optimizers, learning_rate)
+
+    # if config.scheduler.name == 'PresetLRScheduler':
+    #     lr_schedule = dict()
+    #     for n_epoch,lr_coef in dict(config.scheduler.lr_schedule).items():
+    #         lr_schedule[n_epoch] = learning_rate * lr_coef
     
-    lr_scheduler = PresetLRScheduler(lr_schedule)
+    #     lr_scheduler = PresetLRScheduler(lr_schedule)
+    # elif config.scheduler.name == 'ExponentialLR':
+    #     lr_scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=config.scheduler.gamma)
+    # elif config.scheduler.name == 'ZO_mix':
+    #     lr_scheduler_SGD = optim.lr_scheduler.ExponentialLR(optimizer, gamma=config.scheduler.gamma)
+    #     lr_schedule = dict()
+    #     for n_epoch,lr_coef in dict(config.scheduler.lr_schedule).items():
+    #         lr_schedule[n_epoch] = config.optimizer.SCD_lr * lr_coef
+    
+    #     lr_scheduler_SCD = PresetLRScheduler(lr_schedule)
+
+    #     lr_scheduler = lr_scheduler_SGD
+    # else:
+    #     raise ValueError(f"Wrong scheduler_name {config.scheduler.name}")    
+    
     best_acc = 0
     best_epoch = 0
+    
+    # ================== training epochs ======================
+
     for epoch in range(num_epochs):
+        # mix training selection
+        if config.optimizer.name == 'ZO_mix':
+            if epoch < config.optimizer.switch_epoch:
+                optimizer = optimizers[0]
+                lr_scheduler = lr_schedulers[0]
+            else:
+                optimizer = lr_schedulers[1]
+                lr_scheduler = lr_schedulers[1]
+        # single training
+        else:
+            optimizer = optimizers
+            lr_scheduler = lr_schedulers
+
         train(net, trainloader, optimizer, criterion, lr_scheduler, epoch, writer, iteration=iteration, logger=logger)
         test_acc = test(net, testloader, criterion, epoch, writer, iteration, logger=logger)
+        
+        if isinstance(lr_scheduler, PresetLRScheduler):
+            pass
+        else:
+            lr_scheduler.step()
+
         if test_acc > best_acc:
             print('Saving..')
             state = {
@@ -248,67 +337,6 @@ def get_exception_layers(net, exception):
             idx += 1
     return tuple(exc)
 
-class MNIST_FC(nn.Module):
-    def __init__(self):
-        super(MNIST_FC, self).__init__()
-        self.dropout = nn.Dropout(0.5)
-        self.fc1 = nn.Linear(784, 256, bias=False)
-        self.fc2 = nn.Linear(256, 10, bias=False)
-        self.relu = nn.ReLU()
-
-    def forward(self, x):
-        x = torch.flatten(x,1)
-        x = self.fc1(x)
-        x = self.relu(x)
-        x = self.dropout(x)
-        output = self.fc2(x)
-        return output
-
-class MNIST_CNN(nn.Module):
-    def __init__(self):
-        super(MNIST_CNN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=5, padding=2)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=5, padding=2)
-        self.fc1 = nn.Linear(64 * 7 * 7, 1024)
-        self.fc2 = nn.Linear(1024, 10)
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = nn.functional.relu(nn.functional.max_pool2d(x, 2))
-        x = self.conv2(x)
-        x = nn.functional.relu(nn.functional.max_pool2d(x, 2))
-        x = x.view(-1, 64 * 7 * 7)
-        x = self.fc1(x)
-        x = nn.functional.dropout(x, training=self.training)
-        x = self.fc2(x)
-        return x
-        # return nn.functional.log_softmax(x, dim=1)
-
-class MNIST_TTM(nn.Module):
-  def __init__(self,tensor_type,max_rank,dropouts=0.3,prior_type='log_uniform',eta=1.0,device=None,dtype=None):
-    super(MNIST_TTM, self).__init__()
-    self.dropout = nn.Dropout(dropouts)
-    # self.shape1 = [[4,7,7,4], [4,8,8,4]]   
-    # self.shape2 = [[4,8,8,4], [1,5,2,1]]  
-    self.shape1 = [[4,7,7,4], [4,4,4,4]]   
-    self.shape2 = [[4,4,4,4], [1,5,2,1]]    
-    self.fc1 = TensorizedLinear_module(784, 256, bias=None, shape=self.shape1, tensor_type=tensor_type, max_rank=max_rank,
-                                prior_type=prior_type, eta=eta, device=device, dtype=dtype)
-    self.fc2 = TensorizedLinear_module(256, 10, bias=None, shape=self.shape2, tensor_type=tensor_type, max_rank=max_rank,
-                                prior_type=prior_type, eta=eta, device=device, dtype=dtype)
-    self.relu = nn.ReLU()
-
-  def forward(self, x):
-    x = torch.flatten(x,1)
-    x = self.fc1(x)
-    x = self.relu(x)
-    x = self.dropout(x)
-    x = self.fc2(x)
-    return x
-  
-# model = MNIST_CNN()
-# model = torch.load('runs/pruning/mnist/MNIST_GraSP_prune_ratio_90/run_None/checkpoint/finetune_mnist_fc2_r0.9_it0_best.pth.tar')
-
 def main():
     # ================== .yml parser ==========================
     # Config: path of *.yml configuration file
@@ -322,6 +350,8 @@ def main():
     # recursive: also load default.yaml
     configs.load(args.config, recursive=False)  
 
+    print(type(configs.GraSP.pruner))
+    
     if configs.GraSP.network == 'fc':
         model = MNIST_FC()
     elif configs.GraSP.network == 'ttm':
@@ -329,13 +359,19 @@ def main():
             tensor_type=configs.model.tensor_type,
             max_rank = configs.model.max_rank
         )
+    elif configs.GraSP.network == 'tt':
+        model = MNIST_TT(
+            tensor_type='tt',
+            rank=configs.model.rank,
+            dropouts=configs.model.dropouts
+        )
     else:
         raise ValueError(f"Wrong network_name {configs.GraSP.network}")
 
     # ================== Prepare logger ==========================
     paths = [configs.GraSP.dataset]
-    summn = [configs.GraSP.exp_name]
-    chekn = [configs.GraSP.exp_name]
+    summn = [configs.GraSP.network, configs.optimizer.name]
+    chekn = [configs.GraSP.network, configs.optimizer.name]
     if configs.run.runs is not None:
         summn.append('run_%s' % configs.run.runs)
         chekn.append('run_%s' % configs.run.runs)
@@ -359,8 +395,7 @@ def main():
     # for name,parameters in model.named_parameters():
     #     print(name,':',parameters.size())
 
-    # print(get_parameter_number(model))
-    # # stat(model, (inputs,attn,seg))
+    print(get_parameter_number(model))
 
     # ====================================== build ModelBase ======================================
     mb = ModelBase(configs.GraSP.network, configs.GraSP.depth, configs.GraSP.dataset, model)
@@ -396,7 +431,7 @@ def main():
 
     # ====================================== start pruning ======================================
     iteration = 0
-    for _ in range(1):
+    if configs.GraSP.pruner != False:
         logger.info('** Target ratio: %.4f, iter ratio: %.4f, iteration: %d/%d.' % (target_ratio,
                                                                                     ratio,
                                                                                     1,
@@ -425,10 +460,10 @@ def main():
             'ratio': mb.get_ratio_at_each_layer()
         }
         path = os.path.join(ckpt_path, 'prune_%s_%s%s_r%s_it%d.pth.tar' % (configs.GraSP.dataset,
-                                                                           configs.GraSP.network,
-                                                                           configs.GraSP.depth,
-                                                                           configs.GraSP.target_ratio,
-                                                                           iteration))
+                                                                            configs.GraSP.network,
+                                                                            configs.GraSP.depth,
+                                                                            configs.GraSP.target_ratio,
+                                                                            iteration))
         torch.save(state, path)
 
         # ========== print pruning details ============
@@ -436,24 +471,25 @@ def main():
         print_mask_information(mb, logger)
         # logger.info('  LR: %.5f, WD: %.5f, Epochs: %d' %
         #             (learning_rates[iteration], weight_decays[iteration], training_epochs[iteration]))
-
-        # ========== finetuning =======================
-        train_once(mb=mb,
-                   net=mb.model,
-                   named_masks = named_masks,
-                   trainloader=trainloader,
-                   testloader=testloader,
-                   writer=writer,
-                   config=configs,
-                   ckpt_path=ckpt_path,
-                  #  learning_rate=learning_rates[iteration],
-                  #  weight_decay=weight_decays[iteration],
-                  #  num_epochs=training_epochs[iteration],
-                   learning_rate=learning_rates,
-                   weight_decay=weight_decays,
-                   num_epochs=training_epochs,
-                   iteration=iteration,
-                   logger=logger)
+    else:
+        named_masks = None
+    # ======================= Training =======================
+    train_once( mb=mb,
+                net=mb.model,
+                named_masks = named_masks,
+                trainloader=trainloader,
+                testloader=testloader,
+                writer=writer,
+                config=configs,
+                ckpt_path=ckpt_path,
+              #  learning_rate=learning_rates[iteration],
+              #  weight_decay=weight_decays[iteration],
+              #  num_epochs=training_epochs[iteration],
+                learning_rate=learning_rates,
+                weight_decay=weight_decays,
+                num_epochs=training_epochs,
+                iteration=iteration,
+                logger=logger)
 
 
 if __name__ == '__main__':

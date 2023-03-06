@@ -1,16 +1,16 @@
 GraSP:
-  exp_name: "MNIST_ttm_FO_adam"
+  exp_name: "MNIST_ttm_sgd_exp09_layerwise"
   network: ttm
   depth: 2
   dataset: mnist
-  batch_size: 128
-  epoch: 20
-  learning_rate: 0.01
+  batch_size: 64
+  epoch: 25
+  learning_rate: 0.005
   weight_decay: 1e-4
   exception: -1
   iterations: 1
   normalize: false
-  target_ratio: 0.9
+  target_ratio: 0.99
   pruner: False
   pruner_file: False
   num_classes: 10
@@ -19,11 +19,17 @@ GraSP:
   num_iters: 1
 
 optimizer:
-  name: ADAM
+  name: ZO_SGD_mask
+  sigma: 0.1
+  n_sample: 10
+  signSGD: False
+  layer_by_layer: True
+  debug: False
+  comment: 'use pos and neg, extract only data'
 
 scheduler:
-  name: 'PresetLRScheduler'
-  gamma: 0.985
+  name: 'ExponentialLR'
+  gamma: 0.9
   lr_schedule: {0: 1,
                 10: 0.1,
                 20: 0.01}
@@ -44,7 +50,7 @@ model:
   tensorized: 'TensorizedLinear_module'
 
 checkpoint:
-  save_model: "model/MNIST_notensor_2layers_FP32"
+  save_model: "model/MNIST_notensor_SCD"
   save_mode: "best"
   proj_share_weight: 1
   label_smoothing: 1

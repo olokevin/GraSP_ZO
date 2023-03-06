@@ -15,7 +15,7 @@ from . import low_rank_tensors
 # from ..common_types import _size_1_t, _size_2_t, _size_3_t
 
 
-class TensorizedLinear(nn.Linear):
+class TensorizedLinear_linear(nn.Linear):
     def __init__(self,
                 in_features,
                 out_features,
@@ -31,7 +31,7 @@ class TensorizedLinear(nn.Linear):
                 dtype=None,
     ):
 
-        super(TensorizedLinear,self).__init__(in_features,out_features,bias,device,dtype)
+        super(TensorizedLinear_linear,self).__init__(in_features,out_features,bias,device,dtype)
 
         self.in_features = in_features
         self.out_features = out_features
@@ -51,7 +51,7 @@ class TensorizedLinear(nn.Linear):
         self.tensor.update_rank_parameters()
 
 # ================== New TensorizedLinear_module ==================
-class TensorizedLinear_module(nn.Module):
+class TensorizedLinear_module_tonn(nn.Module):
     def __init__(self,
                 in_features,
                 out_features,
@@ -67,7 +67,7 @@ class TensorizedLinear_module(nn.Module):
                 dtype=None,
     ):
 
-        super(TensorizedLinear_module,self).__init__()
+        super(TensorizedLinear_module_tonn,self).__init__()
 
         if tensor_type != 'TensorTrainMatrix':
             raise (ValueError("Only support TensorTrainMatrix now"))
@@ -164,7 +164,7 @@ class TensorizedLinear_module(nn.Module):
 
 # ================== Old TensorizedLinear_module ==================
 from .tt_fwd_bwd import TT_forward
-class TensorizedLinear_module_old(nn.Module):
+class TensorizedLinear_module(nn.Module):
     def __init__(self,
                 in_features,
                 out_features,

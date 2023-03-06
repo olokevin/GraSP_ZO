@@ -1,16 +1,16 @@
 GraSP:
-  exp_name: "MNIST_fc_90_sign_sgd"
+  exp_name: "MNIST_fc_95_sign_sgd_exp"
   network: fc
   depth: 2
   dataset: mnist
-  batch_size: 128
+  batch_size: 64
   epoch: 10
-  learning_rate: 0.01
+  learning_rate: 0.005
   weight_decay: 1e-4
   exception: -1
   iterations: 1
   normalize: false
-  target_ratio: 0.9
+  target_ratio: 0.95
   pruner: GraSP
   pruner_file: GraSP
   num_classes: 10
@@ -20,9 +20,19 @@ GraSP:
 
 optimizer:
   name: ZO_SGD_mask
-  sigma: 0.01
+  sigma: 0.1
   n_sample: 20
   signSGD: True
+  layer_by_layer: True
+  debug: False
+  comment: 'use pos and neg, extract only data'
+
+scheduler:
+  name: 'ExponentialLR'
+  gamma: 0.985
+  lr_schedule: {0: 1,
+                10: 0.1,
+                20: 0.01}
 
 run:
   runs: None

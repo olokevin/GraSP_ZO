@@ -20,6 +20,8 @@ from torch import nn
 from torch.functional import Tensor
 from torch.optim import Optimizer
 from torchonn.op.mzi_op import RealUnitaryDecomposerBatch, checkerboard_to_vector, vector_to_checkerboard
+from tensor_layers.layers import TensorizedLinear_linear, TensorizedLinear_module, TensorizedLinear_module_tonn
+from tensor_fwd_bwd.tensorized_linear import TensorizedLinear
 
 __all__ = ["ZO_SCD_mask"]
 
@@ -32,7 +34,7 @@ class ZO_SCD_mask(Optimizer):
         masks,
         lr: float = 0.1,
         grad_sparsity: float = 0.1,
-        tensorized: bool = False
+        tensorized: str = 'None'
     ):
         defaults = dict(lr=lr)
         super().__init__(model.parameters(), defaults)
@@ -49,27 +51,77 @@ class ZO_SCD_mask(Optimizer):
         self.modules = self.extract_modules(self.model)
         self.trainable_params = self.extract_trainable_parameters(self.model)
         # self.untrainable_params = self.extract_untrainable_parameters(self.model)
-            
-        self.enable_mixedtraining(self.masks)
+
+        if self.masks is not None:
+            self.enable_mixedtraining(self.masks)
+        else:
+            self.disable_mixedtraining()
 
 
     def extract_modules(self, model):
-        return {
-            layer_name: layer
-            for layer_name, layer in model.named_modules()
-            if isinstance(layer, (nn.Linear, nn.Conv2d))
-        }
+        if self.tensorized == 'TensorizedLinear_module_tonn':
+            return {
+                layer_name: layer
+                for layer_name, layer in model.named_modules()
+                if isinstance(layer, (TensorizedLinear_module_tonn))
+            }
+        if self.tensorized == 'TensorizedLinear_module':
+            return {
+                layer_name: layer
+                for layer_name, layer in model.named_modules()
+                if isinstance(layer, (TensorizedLinear_module))
+            }
+        elif self.tensorized == 'TensorizedLinear':
+            return {
+                layer_name: layer
+                for layer_name, layer in model.named_modules()
+                if isinstance(layer, (TensorizedLinear))
+            }
+        else:
+            return {
+                layer_name: layer
+                for layer_name, layer in model.named_modules()
+                if isinstance(layer, (nn.Linear, nn.Conv2d))
+            }
 
     def extract_trainable_parameters(self, model):
         # always flatten the parameters
-        return {
-            layer_name: {
-                param_name: getattr(layer, param_name).view(-1)
-                for param_name in ["weight"]
+        if self.tensorized == 'TensorizedLinear_module_tonn':
+            return {
+                layer_name: {
+                    "tt_cores-"+str(i): getattr(layer,'tt_cores')[i].weight.view(-1)
+                    for i in range(getattr(layer, 'order'))
+                }
+                for layer_name, layer in model.named_modules()
+                if isinstance(layer, (TensorizedLinear_module_tonn))
             }
-            for layer_name, layer in model.named_modules()
-            if isinstance(layer, (nn.Linear, nn.Conv2d))
-        }
+        elif self.tensorized == 'TensorizedLinear_module':
+            return {
+                layer_name: {
+                    str(i): getattr(layer.tensor,'factors')[i].view(-1)
+                    for i in range(getattr(layer.tensor, 'order'))
+                }
+                for layer_name, layer in model.named_modules()
+                if isinstance(layer, (TensorizedLinear_module))
+            }
+        elif self.tensorized == 'TensorizedLinear':
+            return {
+                layer_name: {
+                    str(i): getattr(layer.weight.factors, 'factor_'+str(i)).view(-1)
+                    for i in range(getattr(layer.weight, 'order'))
+                }
+                for layer_name, layer in model.named_modules()
+                if isinstance(layer, (TensorizedLinear))
+            }
+        else:
+            return {
+                layer_name: {  
+                    param_name: getattr(layer, param_name).view(-1)
+                    for param_name in ["weight"]
+                }
+                for layer_name, layer in model.named_modules()
+                if isinstance(layer, (nn.Linear, nn.Conv2d))
+            }
 
     # def extract_untrainable_parameters(self, model):
     #     return {
@@ -107,10 +159,25 @@ class ZO_SCD_mask(Optimizer):
             layer_name:{param_name: p}
         '''
         layer = self.modules[layer_name]
-        if param_name == "weight":
-            layer.weight.data = param.reshape(layer.out_features, layer.in_features)
+        if self.tensorized == 'TensorizedLinear_tonn':
+            raise NotImplementedError
+        if self.tensorized == 'TensorizedLinear_module':
+            idx = int(param_name)
+            ttm_shape = layer.tensor.factors[idx].shape
+            layer.tensor.factors[idx].data = param.reshape(ttm_shape)
+        elif self.tensorized == 'TensorizedLinear':
+            idx = int(param_name)
+            tt_shape = (layer.weight.rank[idx],
+                        layer.weight.shape[idx],
+                        layer.weight.rank[idx+1])
+            # t_param = torch.nn.parameter.Parameter(param.reshape(tt_shape), requires_grad=False)
+            # setattr(layer.weight.factors, 'factor_'+param_name, t_param)
+            setattr(getattr(layer.weight.factors, 'factor_'+param_name), 'data', param.reshape(tt_shape))
         else:
-            raise ValueError(f"Wrong param_name {param_name}")
+            if param_name == "weight":
+                layer.weight.data = param.reshape(layer.out_features, layer.in_features)
+            else:
+                raise ValueError(f"Wrong param_name {param_name}")
 
     def zo_coordinate_descent(self, obj_fn, params):
         """

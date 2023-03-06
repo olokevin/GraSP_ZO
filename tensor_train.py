@@ -31,12 +31,15 @@ from torchstat import stat
 from tqdm import tqdm
 from utils.init_utils import weights_init
 from utils.common_utils import (get_logger, makedirs, process_config, PresetLRScheduler, str_to_list)
+from utils.builder import build_optimizer, build_scheduler
 # from utils.data_utils import get_dataloader
 # from utils.network_utils import get_network
 from models.model_base import ModelBase
 from pruner.GraSP_attn import GraSP_attn
 
 from pyutils.config import configs
+
+from optimizer import ZO_SCD_mask, ZO_SGD_mask
 
 torch.manual_seed(20211214)
 # torch.manual_seed(0)
@@ -338,19 +341,6 @@ transformer = Transformer_sentence_concat_SLU(n_src_vocab, d_word_vec, n_layers,
 print(transformer)
 
 from tensor_layers.layers import TensorizedLinear_module
-def extract_trainable_parameters(model):
-    # always flatten the parameters
-    return {
-        layer_name: {
-            "tt_cores"+str(i): getattr(layer,'tt_cores')[i].weight.view(-1)
-            for i in range(getattr(layer, 'order'))
-        }
-        for layer_name, layer in model.named_modules()
-        if isinstance(layer, (TensorizedLinear_module))
-    }
-
-trainable_params = extract_trainable_parameters(transformer)
-print(trainable_params)
 
 transformer_old = Transformer_sentence_concat_SLU(n_src_vocab, d_word_vec, n_layers, n_head, d_q, d_k, d_v,
             d_model, d_inner, pad_idx, dropout=dropout, n_position=n_position, scale_emb=scale_emb,
@@ -431,8 +421,8 @@ def main():
 
     # ================== Prepare logger ==========================
     paths = [configs.GraSP.dataset]
-    summn = [configs.GraSP.exp_name]
-    chekn = [configs.GraSP.exp_name]
+    summn = [configs.GraSP.exp_name, configs.optimizer.name]
+    chekn = [configs.GraSP.exp_name, configs.optimizer.name]
     if configs.run.runs is not None:
         summn.append('run_%s' % configs.run.runs)
         chekn.append('run_%s' % configs.run.runs)
@@ -446,6 +436,7 @@ def main():
     print("=> config.checkpoint_dir: %s" % configs.GraSP.checkpoint_dir)
 
     logger, writer = init_logger(configs.GraSP)
+    logger.info(dict(configs))
 
     # ====================================== graph and stat ======================================
     t_batch = next(iter(training_data))
@@ -484,7 +475,7 @@ def main():
 
     # ====================================== start pruning ======================================
     iteration = 0
-    for _ in range(1):
+    if configs.GraSP.pruner != False:
         logger.info('** Target ratio: %.4f, iter ratio: %.4f, iteration: %d/%d.' % (target_ratio,
                                                                                     ratio,
                                                                                     1,
@@ -496,7 +487,7 @@ def main():
 
         sample_dataloader = DataLoader(train_iter, batch_size=configs.GraSP.samples_batches*configs.run.batch_size, collate_fn=collate_fn_custom, shuffle=True)
 
-        masks = GraSP_attn(mb.model, ratio, sample_dataloader, 'cuda',
+        masks, named_masks = GraSP_attn(mb.model, ratio, sample_dataloader, 'cuda',
                       num_iters=configs.GraSP.num_iters)
                       # samples_batches = configs.GraSP.samples_batches,
                       # num_classes=configs.GraSP.num_classes,
@@ -527,11 +518,9 @@ def main():
         print_mask_information(mb, logger)
         # logger.info('  LR: %.5f, WD: %.5f, Epochs: %d' %
         #             (learning_rates[iteration], weight_decays[iteration], training_epochs[iteration]))
-
+    else:
+        named_masks = None
     
-
-
-
     # valid_loss, valid_accu, valid_slot_accu = eval_epoch(transformer, validation_data, device, weight=None)
     block = transformer.encoder.layer_stack[0].slf_attn.w_qs
 
@@ -545,25 +534,8 @@ def main():
     #     p.requires_grad = True
     lr = 1e-3
 
-    # for layer in transformer.modules():
-    #     if hasattr(layer, 'tensor'):
-    #         print(layer.parameters())
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
 
-    # transformer.to(torch.float16)
-
-    # optimizer = optim.Adam(par,betas=(0.9, 0.98), eps=1e-6, lr = lr)
-
-    # optimizer = ScheduledOptim(
-    #                 optim.Adam(
-    #                     filter(lambda x: x.requires_grad, transformer.parameters()),
-    #                     betas=(0.9, 0.98), eps=1e-09, lr = 1e-4),
-    #                 opt.d_model, opt.n_warmup_steps)
-    # optimizer_tensor = None
-
-    # optimizer = optim.Adam(
-    #                     filter(lambda x: x.requires_grad, transformer.parameters()),
-    #                     betas=(0.9, 0.98), eps=1e-09, lr = 1e-3)
-    # optimizer_tensor = None
     if precondition == True:
         optimizer_tensor = torch.optim.SGD(tensor_blocks.parameters(),lr = 1e-1)
         optimizer = optim.Adam(filter(lambda x: x.requires_grad, layer_notensor.parameters()),
@@ -615,12 +587,21 @@ def main():
                             filter(lambda x: x.requires_grad, transformer.parameters()),
                             betas=(0.9, 0.98), eps=1e-06, lr = lr)
             optimizer_tensor = None
-            optimizer_ZO = None
+            
+            transformer.requires_grad_(False)
+            optimizer_ZO = ZO_SCD_mask(
+                model = transformer, 
+                criterion = criterion,
+                masks = named_masks,
+                lr = learning_rate,
+                grad_sparsity = config.optimizer.grad_sparsity
+            )
+            # optimizer_ZO = None
     
-    lr_schedule = {0: lr,
-                   int(epochs * 0.5): lr * 0.1,
-                   int(epochs * 0.75): lr * 0.01}
-    lr_scheduler = PresetLRScheduler(lr_schedule)
+    # lr_schedule = {0: lr,
+    #                int(epochs * 0.5): lr * 0.1,
+    #                int(epochs * 0.75): lr * 0.01}
+    # lr_scheduler = PresetLRScheduler(lr_schedule)
     valid_acc_all = [-1]
     train_result = []
     test_result = []
@@ -628,7 +609,7 @@ def main():
         start = time.time()
 
         lr_scheduler(optimizer, epochs)
-        train_loss, train_accu, train_slot_accu = train_epoch_bylayer(transformer, training_data, optimizer,optimizer_ZO=optimizer_ZO ,optimizer_tensor=optimizer_tensor,precondition=precondition,device=device,tensor_blocks=tensor_blocks,step=epoch)
+        train_loss, train_accu, train_slot_accu = train_epoch_bylayer(transformer,training_data,Loss=criterion,optimizer=optimizer,optimizer_ZO=optimizer_ZO ,optimizer_tensor=optimizer_tensor,precondition=precondition,device=device,tensor_blocks=tensor_blocks,step=epoch)
 
         # train_loss, train_accu = 0,0
 
@@ -675,10 +656,16 @@ def main():
     PATH_np = opt.save_model + '.npy'
     np.save(PATH_np,np.array([train_result,test_result]))
 
+# ================== fetch training schemes ==================
+def build_obj_fn(self, data, target, model, criterion):
+        def _obj_fn():
+            y = model(data)
+            return y, criterion(y, target)
+
+        return _obj_fn
 
 
-
-def train_epoch_bylayer(model, training_data, optimizer,optimizer_ZO=None,optimizer_tensor=None, tensor_blocks=None,precondition=False,device='cuda',step=1):
+def train_epoch_bylayer(model, training_data, Loss, optimizer,optimizer_ZO=None,optimizer_tensor=None, tensor_blocks=None,precondition=False,device='cuda',step=1):
     ''' Epoch operation in training phase'''
 
     model.train()
@@ -698,7 +685,6 @@ def train_epoch_bylayer(model, training_data, optimizer,optimizer_ZO=None,optimi
 
     max_memory = 0
 
-    Loss = nn.CrossEntropyLoss(label_smoothing=0.1)
     for batch in tqdm(
             training_data, mininterval=2,
             desc='  - (Training)   ', leave=False):
