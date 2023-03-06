@@ -470,6 +470,9 @@ def main():
 
     # ====================================== fetch training schemes ======================================
     ratio = 1 - (1 - target_ratio) ** (1.0 / num_iterations)
+    learning_rates = float(configs.GraSP.learning_rate)
+    weight_decays = float(configs.GraSP.weight_decay)
+    training_epochs = int(configs.GraSP.epoch)
     logger.info('Normalize: %s, Total iteration: %d, Target ratio: %.2f, Iter ratio %.4f.' %
                 (normalize, num_iterations, target_ratio, ratio))
 
@@ -536,80 +539,56 @@ def main():
 
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
 
-    if precondition == True:
-        optimizer_tensor = torch.optim.SGD(tensor_blocks.parameters(),lr = 1e-1)
-        optimizer = optim.Adam(filter(lambda x: x.requires_grad, layer_notensor.parameters()),
-                    betas=(0.9, 0.98), eps=1e-09, lr = 1e-3)
-    else:
-        if tensorized == True:
-            # optimizer = ScheduledOptim(
-            #             optim.Adam(
-            #                 filter(lambda x: x.requires_grad, transformer.parameters()),
-            #                 betas=(0.9, 0.98), eps=1e-09, lr = 1e-4),
-            #             opt.d_model, opt.n_warmup_steps)
-            # optimizer_tensor = optim.Adam(
-            #                 tensor_blocks.parameters(),
-            #                 betas=(0.9, 0.98), eps=1e-06, lr = 1e-3)
-            
-            # optimizer_tensor = torch.optim.SGD(transformer.parameters(),lr = 1e-1)
-
-            lr = 1e-3
-            # optimizer_tensor = torch.optim.SGD(tensor_blocks.parameters(),lr = 1e-1)
-            optimizer_tensor = optim.Adam(filter(lambda x: x.requires_grad, tensor_blocks.parameters()),betas=(0.9, 0.98), eps=1e-06, lr = lr)
-            optimizer = optim.Adam(layer_notensor.parameters(), betas=(0.9, 0.98), eps=1e-06, lr = lr)
-
-            # optimizer = torch.optim.SGD(transformer.parameters(),lr = 1e-2)
-            # optimizer_tensor = None
-
-            # from ZO_optimizer import ZO_Optimizer
-            # Loss = nn.CrossEntropyLoss(label_smoothing=0.1)
-            # optimizer_ZO = ZO_Optimizer(transformer, Loss, model_old=transformer_old, n_sample=10,sigma=1e-1, device='cuda',sign=False)
-
-            optimizer_ZO = None
-
-            # optimizer = torch.optim.SGD(transformer.parameters(),lr = 1e-1)
-            # optimizer_tensor = None
-            # from ZO_SGD import ZO_SGD_Optimizer
-            # Loss = nn.CrossEntropyLoss(label_smoothing=0.1)
-            # optimizer = ZO_SGD_Optimizer(transformer, Loss, model_old=transformer_old, lr = 1e-3, signSGD = False, n_sample=10, device='cuda')
-            # optimizer_tensor = None
-
-
-            # optimizer = optim.Adam(transformer.parameters(), betas=(0.9, 0.98), eps=1e-04, lr = 1e-3)
-
-            # 
-
-            # optimizer = optim.Adam(filter(lambda x: x.requires_grad, layer_notensor.parameters()),
-                    # betas=(0.9, 0.98), eps=1e-06, lr = 0)
-        else:
-            lr = 1e-3
-            optimizer = optim.Adam(
-                            filter(lambda x: x.requires_grad, transformer.parameters()),
-                            betas=(0.9, 0.98), eps=1e-06, lr = lr)
-            optimizer_tensor = None
-            
-            transformer.requires_grad_(False)
-            optimizer_ZO = ZO_SCD_mask(
-                model = transformer, 
-                criterion = criterion,
-                masks = named_masks,
-                lr = learning_rate,
-                grad_sparsity = config.optimizer.grad_sparsity
-            )
-            # optimizer_ZO = None
+    # ===================== Zi Yang's optimzier setting =====================
     
-    # lr_schedule = {0: lr,
-    #                int(epochs * 0.5): lr * 0.1,
-    #                int(epochs * 0.75): lr * 0.01}
-    # lr_scheduler = PresetLRScheduler(lr_schedule)
+    # if precondition == True:
+    #     optimizer_tensor = torch.optim.SGD(tensor_blocks.parameters(),lr = 1e-1)
+    #     optimizer = optim.Adam(filter(lambda x: x.requires_grad, layer_notensor.parameters()),
+    #                 betas=(0.9, 0.98), eps=1e-09, lr = 1e-3)
+    # else:
+    #     if tensorized == True:
+    #         lr = 1e-3
+    #         # optimizer_tensor = torch.optim.SGD(tensor_blocks.parameters(),lr = 1e-1)
+    #         optimizer_tensor = optim.Adam(filter(lambda x: x.requires_grad, tensor_blocks.parameters()),betas=(0.9, 0.98), eps=1e-06, lr = lr)
+    #         optimizer = optim.Adam(layer_notensor.parameters(), betas=(0.9, 0.98), eps=1e-06, lr = lr)
+
+    #         optimizer_ZO = None
+
+    #     else:
+    #         lr = 1e-3
+    #         optimizer = optim.Adam(
+    #                         filter(lambda x: x.requires_grad, transformer.parameters()),
+    #                         betas=(0.9, 0.98), eps=1e-06, lr = lr)
+    #         optimizer_tensor = None
+            
+    #         transformer.requires_grad_(False)
+    #         optimizer_ZO = None
+
+    optimizers = build_optimizer(configs, model, criterion, named_masks, learning_rate, weight_decay)
+    lr_schedulers = build_scheduler(configs, optimizers, learning_rate)
+
+    
     valid_acc_all = [-1]
     train_result = []
     test_result = []
-    for epoch in range(epochs):
+    for epoch in range(training_epochs):
+        # mix training selection
+        if configs.optimizer.name == 'ZO_mix':
+            if epoch < configs.optimizer.switch_epoch:
+                optimizer = optimizers[0]
+                lr_scheduler = lr_schedulers[0]
+            else:
+                optimizer = lr_schedulers[1]
+                lr_scheduler = lr_schedulers[1]
+        # single training
+        else:
+            optimizer = optimizers
+            lr_scheduler = lr_schedulers
+        
         start = time.time()
 
         lr_scheduler(optimizer, epochs)
-        train_loss, train_accu, train_slot_accu = train_epoch_bylayer(transformer,training_data,Loss=criterion,optimizer=optimizer,optimizer_ZO=optimizer_ZO ,optimizer_tensor=optimizer_tensor,precondition=precondition,device=device,tensor_blocks=tensor_blocks,step=epoch)
+        train_loss, train_accu, train_slot_accu = train_epoch_bylayer(transformer,training_data,Loss=criterion,optimizer=optimizer,precondition=precondition,device=device,tensor_blocks=tensor_blocks,step=epoch)
 
         # train_loss, train_accu = 0,0
 
@@ -665,7 +644,7 @@ def build_obj_fn(self, data, target, model, criterion):
         return _obj_fn
 
 
-def train_epoch_bylayer(model, training_data, Loss, optimizer,optimizer_ZO=None,optimizer_tensor=None, tensor_blocks=None,precondition=False,device='cuda',step=1):
+def train_epoch_bylayer(model, training_data, Loss, optimizer, tensor_blocks=None,precondition=False,device='cuda',step=1):
     ''' Epoch operation in training phase'''
 
     model.train()
@@ -693,9 +672,6 @@ def train_epoch_bylayer(model, training_data, Loss, optimizer,optimizer_ZO=None,
 
 
         optimizer.zero_grad()
-        # print(optimizer.lr)
-        if optimizer_tensor!=None:
-            optimizer_tensor.zero_grad()
 
         # attn = None
         # model.eval()
@@ -714,12 +690,22 @@ def train_epoch_bylayer(model, training_data, Loss, optimizer,optimizer_ZO=None,
         memory = torch.cuda.max_memory_allocated()/1024/1024/1024
         max_memory = max(max_memory,memory)
 
-        if optimizer_ZO!=None:
-            optimizer_ZO.estimate_grad((w1,attn,seg),(target,slot_label))
-            
+        if isinstance(optimizer, ZO_SCD_mask):
+            outputs, loss = optimizer.step(inputs, targets)
+        elif isinstance(optimizer, ZO_SGD_mask):
+            outputs, loss, grads_e = optimizer.step(inputs, targets)
+            # test, check real grads
+            if configs.optimizer.debug == True:
+                test_optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+                outputs = net(inputs)
+                loss = criterion(outputs, targets)
+                loss.backward()
+                test_optimizer.step()
         else:
-            # print(model.encoder.layer_stack[0].slf_attn.w_ks.scale_med.grad)
+            outputs = net(inputs)
+            loss = criterion(outputs, targets)
             loss.backward()
+            optimizer.step()
             
         # print('ZO=',model.encoder.layer_stack[-1].slf_attn.w_ks.tensor.factors[2].grad[1,:10,1])
 

@@ -370,8 +370,8 @@ def main():
 
     # ================== Prepare logger ==========================
     paths = [configs.GraSP.dataset]
-    summn = [configs.GraSP.network, configs.optimizer.name]
-    chekn = [configs.GraSP.network, configs.optimizer.name]
+    summn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.exp_name]
+    chekn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.exp_name]
     if configs.run.runs is not None:
         summn.append('run_%s' % configs.run.runs)
         chekn.append('run_%s' % configs.run.runs)

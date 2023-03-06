@@ -19,13 +19,15 @@ GraSP:
   num_iters: 1
 
 optimizer:
-  name: adamw
-  lr: 0.002
-  weight_decay: 0.01
+  name: ZO_SCD_mask
+  grad_sparsity: 0.5
 
 scheduler:
-  name: cosine
-  lr_min: 0.00002
+  name: 'PresetLRScheduler'
+  gamma: 0.985
+  lr_schedule: {0: 1,
+                10: 0.1,
+                20: 0.01}
 
 run:
   runs: None
@@ -38,9 +40,7 @@ run:
   train_noise: 0
 
 model:
-  tensorized: 0
-  uncompressed: 0
-  precondition: 0
+  tensorized: 'TensorizedLinear_module'
 
 checkpoint:
   save_model: "model/ATIS_notensor_2layers_FP32/GraSP_95"
