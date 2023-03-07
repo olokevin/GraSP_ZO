@@ -3,6 +3,7 @@ import json
 import math
 import os
 import sys
+import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -48,7 +49,9 @@ def init_logger(config):
     path_model = os.path.join(path, 'models/base/%s.py' % config.network.lower())
     path_main = os.path.join(path, 'main_prune_non_imagenet.py')
     path_pruner = os.path.join(path, 'pruner/%s.py' % config.pruner_file)
-    logger = get_logger('log', logpath=config.summary_dir + '/',
+    # logger = get_logger('log', logpath=config.summary_dir + '/',
+    #                     filepath=path_model, package_files=[path_main, path_pruner])
+    logger = get_logger('log', logpath=config.summary_dir,
                         filepath=path_model, package_files=[path_main, path_pruner])
     logger.info(dict(config))
     writer = SummaryWriter(config.summary_dir)
@@ -290,7 +293,7 @@ def train_once(mb, net, named_masks, trainloader, testloader, writer, config, ck
                 optimizer = optimizers[0]
                 lr_scheduler = lr_schedulers[0]
             else:
-                optimizer = lr_schedulers[1]
+                optimizer = optimizers[1]
                 lr_scheduler = lr_schedulers[1]
         # single training
         else:
@@ -349,8 +352,6 @@ def main():
     # load config *.yml file
     # recursive: also load default.yaml
     configs.load(args.config, recursive=False)  
-
-    print(type(configs.GraSP.pruner))
     
     if configs.GraSP.network == 'fc':
         model = MNIST_FC()
@@ -370,15 +371,16 @@ def main():
 
     # ================== Prepare logger ==========================
     paths = [configs.GraSP.dataset]
-    summn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.exp_name]
-    chekn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.exp_name]
+    summn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
+    chekn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
     if configs.run.runs is not None:
-        summn.append('run_%s' % configs.run.runs)
-        chekn.append('run_%s' % configs.run.runs)
-    summn.append("summary/")
-    chekn.append("checkpoint/")
+        summn.append('run_%s/' % configs.run.runs)
+        chekn.append('run_%s/' % configs.run.runs)
+    # summn.append("summary/")
+    # chekn.append("checkpoint/")
     summary_dir = ["./runs/pruning"] + paths + summn
     ckpt_dir = ["./runs/pruning"] + paths + chekn
+    # summary_dir, ckpt_dir is path (with / in the end)
     configs.GraSP.summary_dir = os.path.join(*summary_dir)
     configs.GraSP.checkpoint_dir = os.path.join(*ckpt_dir)
     print("=> config.summary_dir:    %s" % configs.GraSP.summary_dir)
@@ -386,6 +388,10 @@ def main():
 
     logger, writer = init_logger(configs.GraSP)
     logger.info(dict(configs))
+    logger.info(dict(configs.GraSP))
+    logger.info(dict(configs.optimizer))
+    logger.info(dict(configs.scheduler))
+    logger.info(dict(configs.model))
     
     # ====================================== graph and stat ======================================
     # t_batch = next(iter(training_data))

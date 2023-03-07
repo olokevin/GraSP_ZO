@@ -1,0 +1,233 @@
+Namespace(batch_size=64, config='configs/ATIS/GraSP/SGD.yml', d_inner_hid=2048, d_k=64, d_model=768, d_v=64, dropout=0.1, embs_share_weight=False, epoch=100, label_smoothing=True, log=None, n_head=8, n_layers=6, n_warmup_steps=40000, no_cuda=False, ops_idx=None, precondition=0, proj_share_weight=True, quantized=1, save_mode='best', save_model=None, src_vocab_size=19213, tensorized=0, tgt_vocab_size=10839, uncompressed=0)
+Transformer_sentence_concat_SLU(
+  (encoder): Encoder(
+    (src_word_emb): Embedding(800, 768)
+    (position_enc): Embedding(512, 768)
+    (token_type_emb): Embedding(2, 768)
+    (dropout): Dropout(p=0.1, inplace=False)
+    (layer_stack): ModuleList(
+      (0): EncoderLayer(
+        (slf_attn): MultiHeadAttention(
+          (w_qs): Linear(in_features=768, out_features=768, bias=True)
+          (w_ks): Linear(in_features=768, out_features=768, bias=True)
+          (w_vs): Linear(in_features=768, out_features=768, bias=True)
+          (fc): Linear(in_features=768, out_features=768, bias=True)
+          (attention): ScaledDotProductAttention(
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+          (dropout): Dropout(p=0.1, inplace=False)
+          (layer_norm): LayerNorm((768,), eps=1e-06, elementwise_affine=True)
+        )
+        (pos_ffn): PositionwiseFeedForward(
+          (w_1): Linear(in_features=768, out_features=3072, bias=True)
+          (w_2): Linear(in_features=3072, out_features=768, bias=True)
+          (layer_norm): LayerNorm((768,), eps=1e-06, elementwise_affine=True)
+          (dropout): Dropout(p=0.1, inplace=False)
+          (relu): GELU(approximate='none')
+        )
+      )
+      (1): EncoderLayer(
+        (slf_attn): MultiHeadAttention(
+          (w_qs): Linear(in_features=768, out_features=768, bias=True)
+          (w_ks): Linear(in_features=768, out_features=768, bias=True)
+          (w_vs): Linear(in_features=768, out_features=768, bias=True)
+          (fc): Linear(in_features=768, out_features=768, bias=True)
+          (attention): ScaledDotProductAttention(
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+          (dropout): Dropout(p=0.1, inplace=False)
+          (layer_norm): LayerNorm((768,), eps=1e-06, elementwise_affine=True)
+        )
+        (pos_ffn): PositionwiseFeedForward(
+          (w_1): Linear(in_features=768, out_features=3072, bias=True)
+          (w_2): Linear(in_features=3072, out_features=768, bias=True)
+          (layer_norm): LayerNorm((768,), eps=1e-06, elementwise_affine=True)
+          (dropout): Dropout(p=0.1, inplace=False)
+          (relu): GELU(approximate='none')
+        )
+      )
+    )
+    (layer_norm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+  )
+  (preclassifier): Linear(in_features=768, out_features=768, bias=True)
+  (slot_preclassifier): Linear(in_features=768, out_features=768, bias=True)
+  (classifier): Sequential(
+    (0): Linear(in_features=768, out_features=768, bias=True)
+    (1): Tanh()
+    (2): Dropout(p=0.1, inplace=False)
+    (3): Linear(in_features=768, out_features=22, bias=True)
+  )
+  (slot_classifier): Sequential(
+    (0): Linear(in_features=768, out_features=768, bias=True)
+    (1): GELU(approximate='none')
+    (2): LayerNorm((768,), eps=1e-05, elementwise_affine=True)
+    (3): Linear(in_features=768, out_features=121, bias=True)
+  )
+)
+0
+=> config.summary_dir:    ./runs/pruning/ATIS/attn/ZO_SGD_mask/ATIS_GraSP_SGD_95_gamma09_scratch/run_None/summary/
+=> config.checkpoint_dir: ./runs/pruning/ATIS/attn/ZO_SGD_mask/ATIS_GraSP_SGD_95_gamma09_scratch/run_None/checkpoint/
+{'Total': 16479119, 'Trainable': 16479119}
+=> Applying weight initialization(kaiming).
+Iteration of: 0/1
+(1): Iterations 0/1.
+(2): Iterations 0/1.
+(2): Iterations 1/1.
+** norm factor: tensor(0.2894, device='cuda:0')
+** accept:  tensor(-1.3451e-05, device='cuda:0')
+tensor(772264, device='cuda:0')
+=> Using GraSP
+{'encoder.layer_stack.0.slf_attn.w_qs': {'weight': tensor([0., 0., 0.,  ..., 0., 0., 0.], device='cuda:0')}, 'encoder.layer_stack.0.slf_attn.w_ks': {'weight': tensor([0., 0., 0.,  ..., 0., 0., 0.], device='cuda:0')}, 'encoder.layer_stack.0.slf_attn.w_vs': {'weight': tensor([1., 0., 0.,  ..., 1., 1., 0.], device='cuda:0')}, 'encoder.layer_stack.0.slf_attn.fc': {'weight': tensor([0., 0., 0.,  ..., 0., 0., 0.], device='cuda:0')}, 'encoder.layer_stack.0.pos_ffn.w_1': {'weight': tensor([0., 0., 0.,  ..., 0., 0., 0.], device='cuda:0')}, 'encoder.layer_stack.0.pos_ffn.w_2': {'weight': tensor([0., 0., 0.,  ..., 0., 0., 0.], device='cuda:0')}, 'encoder.layer_stack.1.slf_attn.w_qs': {'weight': tensor([0., 0., 0.,  ..., 0., 0., 0.], device='cuda:0')}, 'encoder.layer_stack.1.slf_attn.w_ks': {'weight': tensor([0., 0., 0.,  ..., 0., 0., 0.], device='cuda:0')}, 'encoder.layer_stack.1.slf_attn.w_vs': {'weight': tensor([1., 0., 0.,  ..., 0., 1., 0.], device='cuda:0')}, 'encoder.layer_stack.1.slf_attn.fc': {'weight': tensor([0., 0., 0.,  ..., 0., 0., 0.], device='cuda:0')}, 'encoder.layer_stack.1.pos_ffn.w_1': {'weight': tensor([0., 0., 0.,  ..., 0., 0., 0.], device='cuda:0')}, 'encoder.layer_stack.1.pos_ffn.w_2': {'weight': tensor([0., 0., 0.,  ..., 0., 0., 0.], device='cuda:0')}, 'preclassifier': {'weight': tensor([0., 0., 0.,  ..., 0., 0., 0.], device='cuda:0')}, 'slot_preclassifier': {'weight': tensor([1., 0., 0.,  ..., 0., 0., 0.], device='cuda:0')}, 'classifier.3': {'weight': tensor([0., 1., 1.,  ..., 0., 0., 0.], device='cuda:0')}, 'slot_classifier.3': {'weight': tensor([0., 0., 0.,  ..., 1., 0., 0.], device='cuda:0')}}
+{}
+
+epoch =  0
+  - (Training)   loss:  0.11539, loss_hard:  0.00000, accuracy: 0.424 %, slot accuracy: 38.445,elapse: 1.891 min
+  - (Validation) loss:  0.11395, accuracy: 0.200 %, slot accuracy: 38.874,elapse: 0.027 min
+  - (Test) loss:  0.11177, accuracy: 0.000 %, slot accuracy: 37.844,elapse: 0.027 min
+
+epoch =  1
+  - (Training)   loss:  0.10104, loss_hard:  0.00000, accuracy: 47.666 %, slot accuracy: 49.523,elapse: 1.901 min
+  - (Validation) loss:  0.08181, accuracy: 71.400 %, slot accuracy: 62.827,elapse: 0.028 min
+  - (Test) loss:  0.08184, accuracy: 70.773 %, slot accuracy: 59.908,elapse: 0.028 min
+
+epoch =  2
+  - (Training)   loss:  0.07853, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 60.755,elapse: 2.130 min
+  - (Validation) loss:  0.07495, accuracy: 71.400 %, slot accuracy: 61.319,elapse: 0.036 min
+  - (Test) loss:  0.07577, accuracy: 70.773 %, slot accuracy: 58.086,elapse: 0.036 min
+
+epoch =  3
+  - (Training)   loss:  0.07348, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 62.716,elapse: 2.442 min
+  - (Validation) loss:  0.08567, accuracy: 71.400 %, slot accuracy: 63.160,elapse: 0.035 min
+  - (Test) loss:  0.08879, accuracy: 70.773 %, slot accuracy: 60.017,elapse: 0.035 min
+
+epoch =  4
+  - (Training)   loss:  0.09432, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 63.500,elapse: 2.459 min
+  - (Validation) loss:  0.10958, accuracy: 71.400 %, slot accuracy: 63.177,elapse: 0.037 min
+  - (Test) loss:  0.11320, accuracy: 70.773 %, slot accuracy: 60.028,elapse: 0.037 min
+
+epoch =  5
+  - (Training)   loss:  0.09815, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 63.500,elapse: 2.480 min
+  - (Validation) loss:  0.09795, accuracy: 71.400 %, slot accuracy: 63.177,elapse: 0.044 min
+  - (Test) loss:  0.10111, accuracy: 70.773 %, slot accuracy: 60.028,elapse: 0.044 min
+
+epoch =  6
+  - (Training)   loss:  0.09637, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 62.656,elapse: 2.597 min
+  - (Validation) loss:  0.09978, accuracy: 71.400 %, slot accuracy: 57.356,elapse: 0.038 min
+  - (Test) loss:  0.10072, accuracy: 70.773 %, slot accuracy: 56.296,elapse: 0.038 min
+
+epoch =  7
+  - (Training)   loss:  0.09764, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 61.029,elapse: 1.757 min
+  - (Validation) loss:  0.10623, accuracy: 71.400 %, slot accuracy: 63.160,elapse: 0.019 min
+  - (Test) loss:  0.10747, accuracy: 70.773 %, slot accuracy: 60.017,elapse: 0.019 min
+
+epoch =  8
+  - (Training)   loss:  0.10950, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 63.486,elapse: 1.341 min
+  - (Validation) loss:  0.12477, accuracy: 71.400 %, slot accuracy: 63.177,elapse: 0.019 min
+  - (Test) loss:  0.12731, accuracy: 70.773 %, slot accuracy: 60.039,elapse: 0.019 min
+
+epoch =  9
+  - (Training)   loss:  0.11282, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 63.498,elapse: 1.280 min
+  - (Validation) loss:  0.12256, accuracy: 71.400 %, slot accuracy: 63.177,elapse: 0.019 min
+  - (Test) loss:  0.12776, accuracy: 70.773 %, slot accuracy: 60.028,elapse: 0.019 min
+
+epoch =  10
+  - (Training)   loss:  0.10569, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 63.492,elapse: 1.321 min
+  - (Validation) loss:  0.12197, accuracy: 71.400 %, slot accuracy: 63.177,elapse: 0.018 min
+  - (Test) loss:  0.12550, accuracy: 70.773 %, slot accuracy: 60.028,elapse: 0.018 min
+
+epoch =  11
+  - (Training)   loss:  0.12038, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 63.500,elapse: 1.315 min
+  - (Validation) loss:  0.14138, accuracy: 71.400 %, slot accuracy: 63.177,elapse: 0.019 min
+  - (Test) loss:  0.14518, accuracy: 70.773 %, slot accuracy: 60.028,elapse: 0.019 min
+
+epoch =  12
+  - (Training)   loss:  0.10695, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 55.062,elapse: 1.342 min
+  - (Validation) loss:  0.10925, accuracy: 71.400 %, slot accuracy: 60.670,elapse: 0.019 min
+  - (Test) loss:  0.11165, accuracy: 70.773 %, slot accuracy: 57.529,elapse: 0.019 min
+
+epoch =  13
+  - (Training)   loss:  0.09890, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 60.636,elapse: 1.301 min
+  - (Validation) loss:  0.10712, accuracy: 71.400 %, slot accuracy: 47.659,elapse: 0.018 min
+  - (Test) loss:  0.11009, accuracy: 70.773 %, slot accuracy: 47.676,elapse: 0.018 min
+
+epoch =  14
+  - (Training)   loss:  0.09376, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 63.068,elapse: 1.318 min
+  - (Validation) loss:  0.11348, accuracy: 71.400 %, slot accuracy: 63.177,elapse: 0.019 min
+  - (Test) loss:  0.11718, accuracy: 70.773 %, slot accuracy: 60.028,elapse: 0.019 min
+
+epoch =  15
+  - (Training)   loss:  0.09701, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 57.983,elapse: 1.763 min
+  - (Validation) loss:  0.10465, accuracy: 71.400 %, slot accuracy: 60.074,elapse: 0.026 min
+  - (Test) loss:  0.10655, accuracy: 70.773 %, slot accuracy: 57.617,elapse: 0.026 min
+
+epoch =  16
+  - (Training)   loss:  0.09335, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 54.008,elapse: 1.548 min
+  - (Validation) loss:  0.10496, accuracy: 71.400 %, slot accuracy: 23.514,elapse: 0.019 min
+  - (Test) loss:  0.10641, accuracy: 70.773 %, slot accuracy: 24.596,elapse: 0.019 min
+
+epoch =  17
+  - (Training)   loss:  0.09721, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 56.563,elapse: 1.655 min
+  - (Validation) loss:  0.11198, accuracy: 71.400 %, slot accuracy: 63.177,elapse: 0.025 min
+  - (Test) loss:  0.11713, accuracy: 70.773 %, slot accuracy: 60.028,elapse: 0.025 min
+
+epoch =  18
+  - (Training)   loss:  0.10072, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 62.880,elapse: 1.732 min
+  - (Validation) loss:  0.10607, accuracy: 71.400 %, slot accuracy: 62.967,elapse: 0.025 min
+  - (Test) loss:  0.11007, accuracy: 70.773 %, slot accuracy: 59.570,elapse: 0.025 min
+
+epoch =  19
+  - (Training)   loss:  0.10595, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 63.260,elapse: 1.780 min
+  - (Validation) loss:  0.12480, accuracy: 71.400 %, slot accuracy: 62.792,elapse: 0.026 min
+  - (Test) loss:  0.13006, accuracy: 70.773 %, slot accuracy: 59.952,elapse: 0.026 min
+
+epoch =  20
+  - (Training)   loss:  0.11281, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 63.181,elapse: 2.313 min
+  - (Validation) loss:  0.12486, accuracy: 71.400 %, slot accuracy: 63.160,elapse: 0.034 min
+  - (Test) loss:  0.13025, accuracy: 70.773 %, slot accuracy: 59.941,elapse: 0.034 min
+
+epoch =  21
+  - (Training)   loss:  0.11365, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 62.243,elapse: 2.431 min
+  - (Validation) loss:  0.12133, accuracy: 71.400 %, slot accuracy: 58.092,elapse: 0.034 min
+  - (Test) loss:  0.12726, accuracy: 70.773 %, slot accuracy: 55.663,elapse: 0.034 min
+
+epoch =  22
+  - (Training)   loss:  0.10473, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 62.763,elapse: 2.399 min
+  - (Validation) loss:  0.10316, accuracy: 71.400 %, slot accuracy: 63.177,elapse: 0.035 min
+  - (Test) loss:  0.10931, accuracy: 70.773 %, slot accuracy: 60.028,elapse: 0.035 min
+
+epoch =  23
+  - (Training)   loss:  0.09724, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 63.373,elapse: 2.409 min
+  - (Validation) loss:  0.10365, accuracy: 71.400 %, slot accuracy: 63.072,elapse: 0.035 min
+  - (Test) loss:  0.10963, accuracy: 70.773 %, slot accuracy: 59.734,elapse: 0.035 min
+
+epoch =  24
+  - (Training)   loss:  0.09867, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 63.421,elapse: 2.433 min
+  - (Validation) loss:  0.12464, accuracy: 71.400 %, slot accuracy: 63.177,elapse: 0.034 min
+  - (Test) loss:  0.13159, accuracy: 70.773 %, slot accuracy: 60.028,elapse: 0.034 min
+
+epoch =  25
+  - (Training)   loss:  0.11597, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 63.500,elapse: 2.426 min
+  - (Validation) loss:  0.12228, accuracy: 71.400 %, slot accuracy: 63.177,elapse: 0.034 min
+  - (Test) loss:  0.12787, accuracy: 70.773 %, slot accuracy: 60.028,elapse: 0.034 min
+
+epoch =  26
+  - (Training)   loss:  0.11583, loss_hard:  0.00000, accuracy: 73.844 %, slot accuracy: 63.500,elapse: 2.413 min
+  - (Validation) loss:  0.13017, accuracy: 71.000 %, slot accuracy: 63.177,elapse: 0.035 min
+  - (Test) loss:  0.13616, accuracy: 70.325 %, slot accuracy: 60.028,elapse: 0.035 min
+
+epoch =  27
+  - (Training)   loss:  0.11830, loss_hard:  0.00000, accuracy: 73.442 %, slot accuracy: 63.500,elapse: 2.437 min
+  - (Validation) loss:  0.12938, accuracy: 71.400 %, slot accuracy: 63.177,elapse: 0.035 min
+  - (Test) loss:  0.13747, accuracy: 70.773 %, slot accuracy: 60.028,elapse: 0.035 min
+
+epoch =  28
+  - (Training)   loss:  0.11396, loss_hard:  0.00000, accuracy: 73.911 %, slot accuracy: 63.500,elapse: 2.465 min
+  - (Validation) loss:  0.10970, accuracy: 71.400 %, slot accuracy: 63.177,elapse: 0.035 min
+  - (Test) loss:  0.11542, accuracy: 70.773 %, slot accuracy: 60.028,elapse: 0.035 min
+
+epoch =  29
+  - (Training)   loss:  0.09423, loss_hard:  0.00000, accuracy: 73.889 %, slot accuracy: 63.500,elapse: 2.420 min
+  - (Validation) loss:  0.09618, accuracy: 71.400 %, slot accuracy: 63.177,elapse: 0.034 min
+  - (Test) loss:  0.10114, accuracy: 70.773 %, slot accuracy: 60.028,elapse: 0.034 min
+
+n

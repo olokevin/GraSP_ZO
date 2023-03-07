@@ -1,0 +1,877 @@
+Namespace(batch_size=64, config='configs/ATIS/TTM/SCD.yml', d_inner_hid=2048, d_k=64, d_model=768, d_v=64, dropout=0.1, embs_share_weight=False, epoch=100, label_smoothing=True, log=None, n_head=8, n_layers=6, n_warmup_steps=40000, no_cuda=False, ops_idx=None, precondition=0, proj_share_weight=True, quantized=1, save_mode='best', save_model='model/ATIS_TTM_SCD', src_vocab_size=19213, tensorized=1, tgt_vocab_size=10839, uncompressed=0)
+Transformer_sentence_concat_SLU(
+  (encoder): Encoder(
+    (src_word_emb): TensorizedEmbedding(
+      (tensor): TensorTrainMatrix(
+        (trainable_variables): ParameterList(
+            (0): Parameter containing: [torch.float32 of size 1x8x4x30]
+            (1): Parameter containing: [torch.float32 of size 30x5x4x30]
+            (2): Parameter containing: [torch.float32 of size 30x5x4x30]
+            (3): Parameter containing: [torch.float32 of size 30x4x4x30]
+            (4): Parameter containing: [torch.float32 of size 30x8x3x1]
+            (5): Parameter containing: [torch.float32 of size 1x8x4x30]
+            (6): Parameter containing: [torch.float32 of size 30x5x4x30]
+            (7): Parameter containing: [torch.float32 of size 30x5x4x30]
+            (8): Parameter containing: [torch.float32 of size 30x4x4x30]
+            (9): Parameter containing: [torch.float32 of size 30x8x3x1]
+            (10): Parameter containing: [torch.float32 of size 30]
+            (11): Parameter containing: [torch.float32 of size 30]
+            (12): Parameter containing: [torch.float32 of size 30]
+            (13): Parameter containing: [torch.float32 of size 30]
+        )
+      )
+    )
+    (position_enc): Embedding(512, 768)
+    (token_type_emb): Embedding(2, 768)
+    (dropout): Dropout(p=0.1, inplace=False)
+    (layer_stack): ModuleList(
+      (0): EncoderLayer(
+        (slf_attn): Tensor_Attention(
+          (w_qs): TensorizedLinear_module(
+            (tensor): TensorTrain(
+              (trainable_variables): ParameterList(
+                  (0): Parameter containing: [torch.float32 of size 1x12x12]
+                  (1): Parameter containing: [torch.float32 of size 12x8x20]
+                  (2): Parameter containing: [torch.float32 of size 20x8x20]
+                  (3): Parameter containing: [torch.float32 of size 20x8x20]
+                  (4): Parameter containing: [torch.float32 of size 20x8x12]
+                  (5): Parameter containing: [torch.float32 of size 12x12x1]
+                  (6): Parameter containing: [torch.float32 of size 1x12x12]
+                  (7): Parameter containing: [torch.float32 of size 12x8x20]
+                  (8): Parameter containing: [torch.float32 of size 20x8x20]
+                  (9): Parameter containing: [torch.float32 of size 20x8x20]
+                  (10): Parameter containing: [torch.float32 of size 20x8x12]
+                  (11): Parameter containing: [torch.float32 of size 12x12x1]
+                  (12): Parameter containing: [torch.float32 of size 12]
+                  (13): Parameter containing: [torch.float32 of size 20]
+                  (14): Parameter containing: [torch.float32 of size 20]
+                  (15): Parameter containing: [torch.float32 of size 20]
+                  (16): Parameter containing: [torch.float32 of size 12]
+                  (17): Parameter containing: [torch.float32 of size 12x1]
+                  (18): Parameter containing: [torch.float32 of size 20x1]
+                  (19): Parameter containing: [torch.float32 of size 20x1]
+                  (20): Parameter containing: [torch.float32 of size 20x1]
+                  (21): Parameter containing: [torch.float32 of size 12x1]
+              )
+            )
+          )
+          (w_ks): TensorizedLinear_module(
+            (tensor): TensorTrain(
+              (trainable_variables): ParameterList(
+                  (0): Parameter containing: [torch.float32 of size 1x12x12]
+                  (1): Parameter containing: [torch.float32 of size 12x8x20]
+                  (2): Parameter containing: [torch.float32 of size 20x8x20]
+                  (3): Parameter containing: [torch.float32 of size 20x8x20]
+                  (4): Parameter containing: [torch.float32 of size 20x8x12]
+                  (5): Parameter containing: [torch.float32 of size 12x12x1]
+                  (6): Parameter containing: [torch.float32 of size 1x12x12]
+                  (7): Parameter containing: [torch.float32 of size 12x8x20]
+                  (8): Parameter containing: [torch.float32 of size 20x8x20]
+                  (9): Parameter containing: [torch.float32 of size 20x8x20]
+                  (10): Parameter containing: [torch.float32 of size 20x8x12]
+                  (11): Parameter containing: [torch.float32 of size 12x12x1]
+                  (12): Parameter containing: [torch.float32 of size 12]
+                  (13): Parameter containing: [torch.float32 of size 20]
+                  (14): Parameter containing: [torch.float32 of size 20]
+                  (15): Parameter containing: [torch.float32 of size 20]
+                  (16): Parameter containing: [torch.float32 of size 12]
+                  (17): Parameter containing: [torch.float32 of size 12x1]
+                  (18): Parameter containing: [torch.float32 of size 20x1]
+                  (19): Parameter containing: [torch.float32 of size 20x1]
+                  (20): Parameter containing: [torch.float32 of size 20x1]
+                  (21): Parameter containing: [torch.float32 of size 12x1]
+              )
+            )
+          )
+          (w_vs): TensorizedLinear_module(
+            (tensor): TensorTrain(
+              (trainable_variables): ParameterList(
+                  (0): Parameter containing: [torch.float32 of size 1x12x12]
+                  (1): Parameter containing: [torch.float32 of size 12x8x20]
+                  (2): Parameter containing: [torch.float32 of size 20x8x20]
+                  (3): Parameter containing: [torch.float32 of size 20x8x20]
+                  (4): Parameter containing: [torch.float32 of size 20x8x12]
+                  (5): Parameter containing: [torch.float32 of size 12x12x1]
+                  (6): Parameter containing: [torch.float32 of size 1x12x12]
+                  (7): Parameter containing: [torch.float32 of size 12x8x20]
+                  (8): Parameter containing: [torch.float32 of size 20x8x20]
+                  (9): Parameter containing: [torch.float32 of size 20x8x20]
+                  (10): Parameter containing: [torch.float32 of size 20x8x12]
+                  (11): Parameter containing: [torch.float32 of size 12x12x1]
+                  (12): Parameter containing: [torch.float32 of size 12]
+                  (13): Parameter containing: [torch.float32 of size 20]
+                  (14): Parameter containing: [torch.float32 of size 20]
+                  (15): Parameter containing: [torch.float32 of size 20]
+                  (16): Parameter containing: [torch.float32 of size 12]
+                  (17): Parameter containing: [torch.float32 of size 12x1]
+                  (18): Parameter containing: [torch.float32 of size 20x1]
+                  (19): Parameter containing: [torch.float32 of size 20x1]
+                  (20): Parameter containing: [torch.float32 of size 20x1]
+                  (21): Parameter containing: [torch.float32 of size 12x1]
+              )
+            )
+          )
+          (fc): TensorizedLinear_module(
+            (tensor): TensorTrain(
+              (trainable_variables): ParameterList(
+                  (0): Parameter containing: [torch.float32 of size 1x12x12]
+                  (1): Parameter containing: [torch.float32 of size 12x8x20]
+                  (2): Parameter containing: [torch.float32 of size 20x8x20]
+                  (3): Parameter containing: [torch.float32 of size 20x8x20]
+                  (4): Parameter containing: [torch.float32 of size 20x8x12]
+                  (5): Parameter containing: [torch.float32 of size 12x12x1]
+                  (6): Parameter containing: [torch.float32 of size 1x12x12]
+                  (7): Parameter containing: [torch.float32 of size 12x8x20]
+                  (8): Parameter containing: [torch.float32 of size 20x8x20]
+                  (9): Parameter containing: [torch.float32 of size 20x8x20]
+                  (10): Parameter containing: [torch.float32 of size 20x8x12]
+                  (11): Parameter containing: [torch.float32 of size 12x12x1]
+                  (12): Parameter containing: [torch.float32 of size 12]
+                  (13): Parameter containing: [torch.float32 of size 20]
+                  (14): Parameter containing: [torch.float32 of size 20]
+                  (15): Parameter containing: [torch.float32 of size 20]
+                  (16): Parameter containing: [torch.float32 of size 12]
+                  (17): Parameter containing: [torch.float32 of size 12x1]
+                  (18): Parameter containing: [torch.float32 of size 20x1]
+                  (19): Parameter containing: [torch.float32 of size 20x1]
+                  (20): Parameter containing: [torch.float32 of size 20x1]
+                  (21): Parameter containing: [torch.float32 of size 12x1]
+              )
+            )
+          )
+          (attention): ScaledDotProductAttention(
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+          (dropout): Dropout(p=0.1, inplace=False)
+          (layer_norm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+        )
+        (pos_ffn): Tensor_PFF(
+          (fc_1): TensorizedLinear_module(
+            (tensor): TensorTrain(
+              (trainable_variables): ParameterList(
+                  (0): Parameter containing: [torch.float32 of size 1x12x12]
+                  (1): Parameter containing: [torch.float32 of size 12x8x20]
+                  (2): Parameter containing: [torch.float32 of size 20x8x20]
+                  (3): Parameter containing: [torch.float32 of size 20x12x20]
+                  (4): Parameter containing: [torch.float32 of size 20x16x16]
+                  (5): Parameter containing: [torch.float32 of size 16x16x1]
+                  (6): Parameter containing: [torch.float32 of size 1x12x12]
+                  (7): Parameter containing: [torch.float32 of size 12x8x20]
+                  (8): Parameter containing: [torch.float32 of size 20x8x20]
+                  (9): Parameter containing: [torch.float32 of size 20x12x20]
+                  (10): Parameter containing: [torch.float32 of size 20x16x16]
+                  (11): Parameter containing: [torch.float32 of size 16x16x1]
+                  (12): Parameter containing: [torch.float32 of size 12]
+                  (13): Parameter containing: [torch.float32 of size 20]
+                  (14): Parameter containing: [torch.float32 of size 20]
+                  (15): Parameter containing: [torch.float32 of size 20]
+                  (16): Parameter containing: [torch.float32 of size 16]
+                  (17): Parameter containing: [torch.float32 of size 12x1]
+                  (18): Parameter containing: [torch.float32 of size 20x1]
+                  (19): Parameter containing: [torch.float32 of size 20x1]
+                  (20): Parameter containing: [torch.float32 of size 20x1]
+                  (21): Parameter containing: [torch.float32 of size 16x1]
+              )
+            )
+          )
+          (fc_2): TensorizedLinear_module(
+            (tensor): TensorTrain(
+              (trainable_variables): ParameterList(
+                  (0): Parameter containing: [torch.float32 of size 1x16x16]
+                  (1): Parameter containing: [torch.float32 of size 16x16x20]
+                  (2): Parameter containing: [torch.float32 of size 20x12x20]
+                  (3): Parameter containing: [torch.float32 of size 20x8x20]
+                  (4): Parameter containing: [torch.float32 of size 20x8x12]
+                  (5): Parameter containing: [torch.float32 of size 12x12x1]
+                  (6): Parameter containing: [torch.float32 of size 1x16x16]
+                  (7): Parameter containing: [torch.float32 of size 16x16x20]
+                  (8): Parameter containing: [torch.float32 of size 20x12x20]
+                  (9): Parameter containing: [torch.float32 of size 20x8x20]
+                  (10): Parameter containing: [torch.float32 of size 20x8x12]
+                  (11): Parameter containing: [torch.float32 of size 12x12x1]
+                  (12): Parameter containing: [torch.float32 of size 16]
+                  (13): Parameter containing: [torch.float32 of size 20]
+                  (14): Parameter containing: [torch.float32 of size 20]
+                  (15): Parameter containing: [torch.float32 of size 20]
+                  (16): Parameter containing: [torch.float32 of size 12]
+                  (17): Parameter containing: [torch.float32 of size 16x1]
+                  (18): Parameter containing: [torch.float32 of size 20x1]
+                  (19): Parameter containing: [torch.float32 of size 20x1]
+                  (20): Parameter containing: [torch.float32 of size 20x1]
+                  (21): Parameter containing: [torch.float32 of size 12x1]
+              )
+            )
+          )
+          (relu): GELU(approximate='none')
+          (layer_norm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+          (dropout): Dropout(p=0.1, inplace=False)
+        )
+      )
+      (1): EncoderLayer(
+        (slf_attn): Tensor_Attention(
+          (w_qs): TensorizedLinear_module(
+            (tensor): TensorTrain(
+              (trainable_variables): ParameterList(
+                  (0): Parameter containing: [torch.float32 of size 1x12x12]
+                  (1): Parameter containing: [torch.float32 of size 12x8x20]
+                  (2): Parameter containing: [torch.float32 of size 20x8x20]
+                  (3): Parameter containing: [torch.float32 of size 20x8x20]
+                  (4): Parameter containing: [torch.float32 of size 20x8x12]
+                  (5): Parameter containing: [torch.float32 of size 12x12x1]
+                  (6): Parameter containing: [torch.float32 of size 1x12x12]
+                  (7): Parameter containing: [torch.float32 of size 12x8x20]
+                  (8): Parameter containing: [torch.float32 of size 20x8x20]
+                  (9): Parameter containing: [torch.float32 of size 20x8x20]
+                  (10): Parameter containing: [torch.float32 of size 20x8x12]
+                  (11): Parameter containing: [torch.float32 of size 12x12x1]
+                  (12): Parameter containing: [torch.float32 of size 12]
+                  (13): Parameter containing: [torch.float32 of size 20]
+                  (14): Parameter containing: [torch.float32 of size 20]
+                  (15): Parameter containing: [torch.float32 of size 20]
+                  (16): Parameter containing: [torch.float32 of size 12]
+                  (17): Parameter containing: [torch.float32 of size 12x1]
+                  (18): Parameter containing: [torch.float32 of size 20x1]
+                  (19): Parameter containing: [torch.float32 of size 20x1]
+                  (20): Parameter containing: [torch.float32 of size 20x1]
+                  (21): Parameter containing: [torch.float32 of size 12x1]
+              )
+            )
+          )
+          (w_ks): TensorizedLinear_module(
+            (tensor): TensorTrain(
+              (trainable_variables): ParameterList(
+                  (0): Parameter containing: [torch.float32 of size 1x12x12]
+                  (1): Parameter containing: [torch.float32 of size 12x8x20]
+                  (2): Parameter containing: [torch.float32 of size 20x8x20]
+                  (3): Parameter containing: [torch.float32 of size 20x8x20]
+                  (4): Parameter containing: [torch.float32 of size 20x8x12]
+                  (5): Parameter containing: [torch.float32 of size 12x12x1]
+                  (6): Parameter containing: [torch.float32 of size 1x12x12]
+                  (7): Parameter containing: [torch.float32 of size 12x8x20]
+                  (8): Parameter containing: [torch.float32 of size 20x8x20]
+                  (9): Parameter containing: [torch.float32 of size 20x8x20]
+                  (10): Parameter containing: [torch.float32 of size 20x8x12]
+                  (11): Parameter containing: [torch.float32 of size 12x12x1]
+                  (12): Parameter containing: [torch.float32 of size 12]
+                  (13): Parameter containing: [torch.float32 of size 20]
+                  (14): Parameter containing: [torch.float32 of size 20]
+                  (15): Parameter containing: [torch.float32 of size 20]
+                  (16): Parameter containing: [torch.float32 of size 12]
+                  (17): Parameter containing: [torch.float32 of size 12x1]
+                  (18): Parameter containing: [torch.float32 of size 20x1]
+                  (19): Parameter containing: [torch.float32 of size 20x1]
+                  (20): Parameter containing: [torch.float32 of size 20x1]
+                  (21): Parameter containing: [torch.float32 of size 12x1]
+              )
+            )
+          )
+          (w_vs): TensorizedLinear_module(
+            (tensor): TensorTrain(
+              (trainable_variables): ParameterList(
+                  (0): Parameter containing: [torch.float32 of size 1x12x12]
+                  (1): Parameter containing: [torch.float32 of size 12x8x20]
+                  (2): Parameter containing: [torch.float32 of size 20x8x20]
+                  (3): Parameter containing: [torch.float32 of size 20x8x20]
+                  (4): Parameter containing: [torch.float32 of size 20x8x12]
+                  (5): Parameter containing: [torch.float32 of size 12x12x1]
+                  (6): Parameter containing: [torch.float32 of size 1x12x12]
+                  (7): Parameter containing: [torch.float32 of size 12x8x20]
+                  (8): Parameter containing: [torch.float32 of size 20x8x20]
+                  (9): Parameter containing: [torch.float32 of size 20x8x20]
+                  (10): Parameter containing: [torch.float32 of size 20x8x12]
+                  (11): Parameter containing: [torch.float32 of size 12x12x1]
+                  (12): Parameter containing: [torch.float32 of size 12]
+                  (13): Parameter containing: [torch.float32 of size 20]
+                  (14): Parameter containing: [torch.float32 of size 20]
+                  (15): Parameter containing: [torch.float32 of size 20]
+                  (16): Parameter containing: [torch.float32 of size 12]
+                  (17): Parameter containing: [torch.float32 of size 12x1]
+                  (18): Parameter containing: [torch.float32 of size 20x1]
+                  (19): Parameter containing: [torch.float32 of size 20x1]
+                  (20): Parameter containing: [torch.float32 of size 20x1]
+                  (21): Parameter containing: [torch.float32 of size 12x1]
+              )
+            )
+          )
+          (fc): TensorizedLinear_module(
+            (tensor): TensorTrain(
+              (trainable_variables): ParameterList(
+                  (0): Parameter containing: [torch.float32 of size 1x12x12]
+                  (1): Parameter containing: [torch.float32 of size 12x8x20]
+                  (2): Parameter containing: [torch.float32 of size 20x8x20]
+                  (3): Parameter containing: [torch.float32 of size 20x8x20]
+                  (4): Parameter containing: [torch.float32 of size 20x8x12]
+                  (5): Parameter containing: [torch.float32 of size 12x12x1]
+                  (6): Parameter containing: [torch.float32 of size 1x12x12]
+                  (7): Parameter containing: [torch.float32 of size 12x8x20]
+                  (8): Parameter containing: [torch.float32 of size 20x8x20]
+                  (9): Parameter containing: [torch.float32 of size 20x8x20]
+                  (10): Parameter containing: [torch.float32 of size 20x8x12]
+                  (11): Parameter containing: [torch.float32 of size 12x12x1]
+                  (12): Parameter containing: [torch.float32 of size 12]
+                  (13): Parameter containing: [torch.float32 of size 20]
+                  (14): Parameter containing: [torch.float32 of size 20]
+                  (15): Parameter containing: [torch.float32 of size 20]
+                  (16): Parameter containing: [torch.float32 of size 12]
+                  (17): Parameter containing: [torch.float32 of size 12x1]
+                  (18): Parameter containing: [torch.float32 of size 20x1]
+                  (19): Parameter containing: [torch.float32 of size 20x1]
+                  (20): Parameter containing: [torch.float32 of size 20x1]
+                  (21): Parameter containing: [torch.float32 of size 12x1]
+              )
+            )
+          )
+          (attention): ScaledDotProductAttention(
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+          (dropout): Dropout(p=0.1, inplace=False)
+          (layer_norm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+        )
+        (pos_ffn): Tensor_PFF(
+          (fc_1): TensorizedLinear_module(
+            (tensor): TensorTrain(
+              (trainable_variables): ParameterList(
+                  (0): Parameter containing: [torch.float32 of size 1x12x12]
+                  (1): Parameter containing: [torch.float32 of size 12x8x20]
+                  (2): Parameter containing: [torch.float32 of size 20x8x20]
+                  (3): Parameter containing: [torch.float32 of size 20x12x20]
+                  (4): Parameter containing: [torch.float32 of size 20x16x16]
+                  (5): Parameter containing: [torch.float32 of size 16x16x1]
+                  (6): Parameter containing: [torch.float32 of size 1x12x12]
+                  (7): Parameter containing: [torch.float32 of size 12x8x20]
+                  (8): Parameter containing: [torch.float32 of size 20x8x20]
+                  (9): Parameter containing: [torch.float32 of size 20x12x20]
+                  (10): Parameter containing: [torch.float32 of size 20x16x16]
+                  (11): Parameter containing: [torch.float32 of size 16x16x1]
+                  (12): Parameter containing: [torch.float32 of size 12]
+                  (13): Parameter containing: [torch.float32 of size 20]
+                  (14): Parameter containing: [torch.float32 of size 20]
+                  (15): Parameter containing: [torch.float32 of size 20]
+                  (16): Parameter containing: [torch.float32 of size 16]
+                  (17): Parameter containing: [torch.float32 of size 12x1]
+                  (18): Parameter containing: [torch.float32 of size 20x1]
+                  (19): Parameter containing: [torch.float32 of size 20x1]
+                  (20): Parameter containing: [torch.float32 of size 20x1]
+                  (21): Parameter containing: [torch.float32 of size 16x1]
+              )
+            )
+          )
+          (fc_2): TensorizedLinear_module(
+            (tensor): TensorTrain(
+              (trainable_variables): ParameterList(
+                  (0): Parameter containing: [torch.float32 of size 1x16x16]
+                  (1): Parameter containing: [torch.float32 of size 16x16x20]
+                  (2): Parameter containing: [torch.float32 of size 20x12x20]
+                  (3): Parameter containing: [torch.float32 of size 20x8x20]
+                  (4): Parameter containing: [torch.float32 of size 20x8x12]
+                  (5): Parameter containing: [torch.float32 of size 12x12x1]
+                  (6): Parameter containing: [torch.float32 of size 1x16x16]
+                  (7): Parameter containing: [torch.float32 of size 16x16x20]
+                  (8): Parameter containing: [torch.float32 of size 20x12x20]
+                  (9): Parameter containing: [torch.float32 of size 20x8x20]
+                  (10): Parameter containing: [torch.float32 of size 20x8x12]
+                  (11): Parameter containing: [torch.float32 of size 12x12x1]
+                  (12): Parameter containing: [torch.float32 of size 16]
+                  (13): Parameter containing: [torch.float32 of size 20]
+                  (14): Parameter containing: [torch.float32 of size 20]
+                  (15): Parameter containing: [torch.float32 of size 20]
+                  (16): Parameter containing: [torch.float32 of size 12]
+                  (17): Parameter containing: [torch.float32 of size 16x1]
+                  (18): Parameter containing: [torch.float32 of size 20x1]
+                  (19): Parameter containing: [torch.float32 of size 20x1]
+                  (20): Parameter containing: [torch.float32 of size 20x1]
+                  (21): Parameter containing: [torch.float32 of size 12x1]
+              )
+            )
+          )
+          (relu): GELU(approximate='none')
+          (layer_norm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+          (dropout): Dropout(p=0.1, inplace=False)
+        )
+      )
+    )
+    (layer_norm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+  )
+  (preclassifier): TensorizedLinear_module(
+    (tensor): TensorTrain(
+      (trainable_variables): ParameterList(
+          (0): Parameter containing: [torch.float32 of size 1x12x12]
+          (1): Parameter containing: [torch.float32 of size 12x8x20]
+          (2): Parameter containing: [torch.float32 of size 20x8x20]
+          (3): Parameter containing: [torch.float32 of size 20x8x20]
+          (4): Parameter containing: [torch.float32 of size 20x8x12]
+          (5): Parameter containing: [torch.float32 of size 12x12x1]
+          (6): Parameter containing: [torch.float32 of size 1x12x12]
+          (7): Parameter containing: [torch.float32 of size 12x8x20]
+          (8): Parameter containing: [torch.float32 of size 20x8x20]
+          (9): Parameter containing: [torch.float32 of size 20x8x20]
+          (10): Parameter containing: [torch.float32 of size 20x8x12]
+          (11): Parameter containing: [torch.float32 of size 12x12x1]
+          (12): Parameter containing: [torch.float32 of size 12]
+          (13): Parameter containing: [torch.float32 of size 20]
+          (14): Parameter containing: [torch.float32 of size 20]
+          (15): Parameter containing: [torch.float32 of size 20]
+          (16): Parameter containing: [torch.float32 of size 12]
+          (17): Parameter containing: [torch.float32 of size 12x1]
+          (18): Parameter containing: [torch.float32 of size 20x1]
+          (19): Parameter containing: [torch.float32 of size 20x1]
+          (20): Parameter containing: [torch.float32 of size 20x1]
+          (21): Parameter containing: [torch.float32 of size 12x1]
+      )
+    )
+  )
+  (slot_preclassifier): TensorizedLinear_module(
+    (tensor): TensorTrain(
+      (trainable_variables): ParameterList(
+          (0): Parameter containing: [torch.float32 of size 1x12x12]
+          (1): Parameter containing: [torch.float32 of size 12x8x20]
+          (2): Parameter containing: [torch.float32 of size 20x8x20]
+          (3): Parameter containing: [torch.float32 of size 20x8x20]
+          (4): Parameter containing: [torch.float32 of size 20x8x12]
+          (5): Parameter containing: [torch.float32 of size 12x12x1]
+          (6): Parameter containing: [torch.float32 of size 1x12x12]
+          (7): Parameter containing: [torch.float32 of size 12x8x20]
+          (8): Parameter containing: [torch.float32 of size 20x8x20]
+          (9): Parameter containing: [torch.float32 of size 20x8x20]
+          (10): Parameter containing: [torch.float32 of size 20x8x12]
+          (11): Parameter containing: [torch.float32 of size 12x12x1]
+          (12): Parameter containing: [torch.float32 of size 12]
+          (13): Parameter containing: [torch.float32 of size 20]
+          (14): Parameter containing: [torch.float32 of size 20]
+          (15): Parameter containing: [torch.float32 of size 20]
+          (16): Parameter containing: [torch.float32 of size 12]
+          (17): Parameter containing: [torch.float32 of size 12x1]
+          (18): Parameter containing: [torch.float32 of size 20x1]
+          (19): Parameter containing: [torch.float32 of size 20x1]
+          (20): Parameter containing: [torch.float32 of size 20x1]
+          (21): Parameter containing: [torch.float32 of size 12x1]
+      )
+    )
+  )
+  (classifier): Sequential(
+    (0): TensorizedLinear_module(
+      (tensor): TensorTrain(
+        (trainable_variables): ParameterList(
+            (0): Parameter containing: [torch.float32 of size 1x12x12]
+            (1): Parameter containing: [torch.float32 of size 12x8x20]
+            (2): Parameter containing: [torch.float32 of size 20x8x20]
+            (3): Parameter containing: [torch.float32 of size 20x8x20]
+            (4): Parameter containing: [torch.float32 of size 20x8x12]
+            (5): Parameter containing: [torch.float32 of size 12x12x1]
+            (6): Parameter containing: [torch.float32 of size 1x12x12]
+            (7): Parameter containing: [torch.float32 of size 12x8x20]
+            (8): Parameter containing: [torch.float32 of size 20x8x20]
+            (9): Parameter containing: [torch.float32 of size 20x8x20]
+            (10): Parameter containing: [torch.float32 of size 20x8x12]
+            (11): Parameter containing: [torch.float32 of size 12x12x1]
+            (12): Parameter containing: [torch.float32 of size 12]
+            (13): Parameter containing: [torch.float32 of size 20]
+            (14): Parameter containing: [torch.float32 of size 20]
+            (15): Parameter containing: [torch.float32 of size 20]
+            (16): Parameter containing: [torch.float32 of size 12]
+            (17): Parameter containing: [torch.float32 of size 12x1]
+            (18): Parameter containing: [torch.float32 of size 20x1]
+            (19): Parameter containing: [torch.float32 of size 20x1]
+            (20): Parameter containing: [torch.float32 of size 20x1]
+            (21): Parameter containing: [torch.float32 of size 12x1]
+        )
+      )
+    )
+    (1): Tanh()
+    (2): Dropout(p=0.1, inplace=False)
+    (3): Linear(in_features=768, out_features=22, bias=True)
+  )
+  (slot_classifier): Sequential(
+    (0): TensorizedLinear_module(
+      (tensor): TensorTrain(
+        (trainable_variables): ParameterList(
+            (0): Parameter containing: [torch.float32 of size 1x12x12]
+            (1): Parameter containing: [torch.float32 of size 12x8x20]
+            (2): Parameter containing: [torch.float32 of size 20x8x20]
+            (3): Parameter containing: [torch.float32 of size 20x8x20]
+            (4): Parameter containing: [torch.float32 of size 20x8x12]
+            (5): Parameter containing: [torch.float32 of size 12x12x1]
+            (6): Parameter containing: [torch.float32 of size 1x12x12]
+            (7): Parameter containing: [torch.float32 of size 12x8x20]
+            (8): Parameter containing: [torch.float32 of size 20x8x20]
+            (9): Parameter containing: [torch.float32 of size 20x8x20]
+            (10): Parameter containing: [torch.float32 of size 20x8x12]
+            (11): Parameter containing: [torch.float32 of size 12x12x1]
+            (12): Parameter containing: [torch.float32 of size 12]
+            (13): Parameter containing: [torch.float32 of size 20]
+            (14): Parameter containing: [torch.float32 of size 20]
+            (15): Parameter containing: [torch.float32 of size 20]
+            (16): Parameter containing: [torch.float32 of size 12]
+            (17): Parameter containing: [torch.float32 of size 12x1]
+            (18): Parameter containing: [torch.float32 of size 20x1]
+            (19): Parameter containing: [torch.float32 of size 20x1]
+            (20): Parameter containing: [torch.float32 of size 20x1]
+            (21): Parameter containing: [torch.float32 of size 12x1]
+        )
+      )
+    )
+    (1): GELU(approximate='none')
+    (2): LayerNorm((768,), eps=1e-05, elementwise_affine=True)
+    (3): Linear(in_features=768, out_features=121, bias=True)
+  )
+)
+0
+=> config.summary_dir:    ./runs/pruning/ATIS/attn/ZO_SCD_mask/ATIS_TTM_SCD/run_None/summary/
+=> config.checkpoint_dir: ./runs/pruning/ATIS/attn/ZO_SCD_mask/ATIS_TTM_SCD/run_None/checkpoint/
+encoder.src_word_emb.tensor.trainable_variables.0 : torch.Size([1, 8, 4, 30])
+encoder.src_word_emb.tensor.trainable_variables.1 : torch.Size([30, 5, 4, 30])
+encoder.src_word_emb.tensor.trainable_variables.2 : torch.Size([30, 5, 4, 30])
+encoder.src_word_emb.tensor.trainable_variables.3 : torch.Size([30, 4, 4, 30])
+encoder.src_word_emb.tensor.trainable_variables.4 : torch.Size([30, 8, 3, 1])
+encoder.src_word_emb.tensor.trainable_variables.5 : torch.Size([1, 8, 4, 30])
+encoder.src_word_emb.tensor.trainable_variables.6 : torch.Size([30, 5, 4, 30])
+encoder.src_word_emb.tensor.trainable_variables.7 : torch.Size([30, 5, 4, 30])
+encoder.src_word_emb.tensor.trainable_variables.8 : torch.Size([30, 4, 4, 30])
+encoder.src_word_emb.tensor.trainable_variables.9 : torch.Size([30, 8, 3, 1])
+encoder.src_word_emb.tensor.trainable_variables.10 : torch.Size([30])
+encoder.src_word_emb.tensor.trainable_variables.11 : torch.Size([30])
+encoder.src_word_emb.tensor.trainable_variables.12 : torch.Size([30])
+encoder.src_word_emb.tensor.trainable_variables.13 : torch.Size([30])
+encoder.position_enc.weight : torch.Size([512, 768])
+encoder.token_type_emb.weight : torch.Size([2, 768])
+encoder.layer_stack.0.slf_attn.w_qs.bias : torch.Size([768])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.0 : torch.Size([1, 12, 12])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.1 : torch.Size([12, 8, 20])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.2 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.3 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.4 : torch.Size([20, 8, 12])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.5 : torch.Size([12, 12, 1])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.6 : torch.Size([1, 12, 12])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.7 : torch.Size([12, 8, 20])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.8 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.9 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.10 : torch.Size([20, 8, 12])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.11 : torch.Size([12, 12, 1])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.12 : torch.Size([12])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.13 : torch.Size([20])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.14 : torch.Size([20])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.15 : torch.Size([20])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.16 : torch.Size([12])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.17 : torch.Size([12, 1])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.18 : torch.Size([20, 1])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.19 : torch.Size([20, 1])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.20 : torch.Size([20, 1])
+encoder.layer_stack.0.slf_attn.w_qs.tensor.trainable_variables.21 : torch.Size([12, 1])
+encoder.layer_stack.0.slf_attn.w_ks.bias : torch.Size([768])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.0 : torch.Size([1, 12, 12])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.1 : torch.Size([12, 8, 20])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.2 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.3 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.4 : torch.Size([20, 8, 12])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.5 : torch.Size([12, 12, 1])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.6 : torch.Size([1, 12, 12])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.7 : torch.Size([12, 8, 20])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.8 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.9 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.10 : torch.Size([20, 8, 12])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.11 : torch.Size([12, 12, 1])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.12 : torch.Size([12])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.13 : torch.Size([20])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.14 : torch.Size([20])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.15 : torch.Size([20])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.16 : torch.Size([12])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.17 : torch.Size([12, 1])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.18 : torch.Size([20, 1])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.19 : torch.Size([20, 1])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.20 : torch.Size([20, 1])
+encoder.layer_stack.0.slf_attn.w_ks.tensor.trainable_variables.21 : torch.Size([12, 1])
+encoder.layer_stack.0.slf_attn.w_vs.bias : torch.Size([768])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.0 : torch.Size([1, 12, 12])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.1 : torch.Size([12, 8, 20])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.2 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.3 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.4 : torch.Size([20, 8, 12])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.5 : torch.Size([12, 12, 1])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.6 : torch.Size([1, 12, 12])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.7 : torch.Size([12, 8, 20])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.8 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.9 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.10 : torch.Size([20, 8, 12])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.11 : torch.Size([12, 12, 1])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.12 : torch.Size([12])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.13 : torch.Size([20])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.14 : torch.Size([20])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.15 : torch.Size([20])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.16 : torch.Size([12])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.17 : torch.Size([12, 1])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.18 : torch.Size([20, 1])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.19 : torch.Size([20, 1])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.20 : torch.Size([20, 1])
+encoder.layer_stack.0.slf_attn.w_vs.tensor.trainable_variables.21 : torch.Size([12, 1])
+encoder.layer_stack.0.slf_attn.fc.bias : torch.Size([768])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.0 : torch.Size([1, 12, 12])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.1 : torch.Size([12, 8, 20])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.2 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.3 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.4 : torch.Size([20, 8, 12])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.5 : torch.Size([12, 12, 1])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.6 : torch.Size([1, 12, 12])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.7 : torch.Size([12, 8, 20])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.8 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.9 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.10 : torch.Size([20, 8, 12])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.11 : torch.Size([12, 12, 1])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.12 : torch.Size([12])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.13 : torch.Size([20])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.14 : torch.Size([20])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.15 : torch.Size([20])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.16 : torch.Size([12])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.17 : torch.Size([12, 1])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.18 : torch.Size([20, 1])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.19 : torch.Size([20, 1])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.20 : torch.Size([20, 1])
+encoder.layer_stack.0.slf_attn.fc.tensor.trainable_variables.21 : torch.Size([12, 1])
+encoder.layer_stack.0.slf_attn.layer_norm.weight : torch.Size([768])
+encoder.layer_stack.0.slf_attn.layer_norm.bias : torch.Size([768])
+encoder.layer_stack.0.pos_ffn.fc_1.bias : torch.Size([3072])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.0 : torch.Size([1, 12, 12])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.1 : torch.Size([12, 8, 20])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.2 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.3 : torch.Size([20, 12, 20])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.4 : torch.Size([20, 16, 16])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.5 : torch.Size([16, 16, 1])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.6 : torch.Size([1, 12, 12])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.7 : torch.Size([12, 8, 20])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.8 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.9 : torch.Size([20, 12, 20])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.10 : torch.Size([20, 16, 16])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.11 : torch.Size([16, 16, 1])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.12 : torch.Size([12])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.13 : torch.Size([20])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.14 : torch.Size([20])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.15 : torch.Size([20])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.16 : torch.Size([16])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.17 : torch.Size([12, 1])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.18 : torch.Size([20, 1])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.19 : torch.Size([20, 1])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.20 : torch.Size([20, 1])
+encoder.layer_stack.0.pos_ffn.fc_1.tensor.trainable_variables.21 : torch.Size([16, 1])
+encoder.layer_stack.0.pos_ffn.fc_2.bias : torch.Size([768])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.0 : torch.Size([1, 16, 16])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.1 : torch.Size([16, 16, 20])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.2 : torch.Size([20, 12, 20])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.3 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.4 : torch.Size([20, 8, 12])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.5 : torch.Size([12, 12, 1])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.6 : torch.Size([1, 16, 16])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.7 : torch.Size([16, 16, 20])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.8 : torch.Size([20, 12, 20])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.9 : torch.Size([20, 8, 20])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.10 : torch.Size([20, 8, 12])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.11 : torch.Size([12, 12, 1])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.12 : torch.Size([16])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.13 : torch.Size([20])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.14 : torch.Size([20])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.15 : torch.Size([20])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.16 : torch.Size([12])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.17 : torch.Size([16, 1])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.18 : torch.Size([20, 1])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.19 : torch.Size([20, 1])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.20 : torch.Size([20, 1])
+encoder.layer_stack.0.pos_ffn.fc_2.tensor.trainable_variables.21 : torch.Size([12, 1])
+encoder.layer_stack.0.pos_ffn.layer_norm.weight : torch.Size([768])
+encoder.layer_stack.0.pos_ffn.layer_norm.bias : torch.Size([768])
+encoder.layer_stack.1.slf_attn.w_qs.bias : torch.Size([768])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.0 : torch.Size([1, 12, 12])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.1 : torch.Size([12, 8, 20])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.2 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.3 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.4 : torch.Size([20, 8, 12])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.5 : torch.Size([12, 12, 1])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.6 : torch.Size([1, 12, 12])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.7 : torch.Size([12, 8, 20])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.8 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.9 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.10 : torch.Size([20, 8, 12])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.11 : torch.Size([12, 12, 1])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.12 : torch.Size([12])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.13 : torch.Size([20])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.14 : torch.Size([20])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.15 : torch.Size([20])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.16 : torch.Size([12])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.17 : torch.Size([12, 1])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.18 : torch.Size([20, 1])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.19 : torch.Size([20, 1])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.20 : torch.Size([20, 1])
+encoder.layer_stack.1.slf_attn.w_qs.tensor.trainable_variables.21 : torch.Size([12, 1])
+encoder.layer_stack.1.slf_attn.w_ks.bias : torch.Size([768])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.0 : torch.Size([1, 12, 12])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.1 : torch.Size([12, 8, 20])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.2 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.3 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.4 : torch.Size([20, 8, 12])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.5 : torch.Size([12, 12, 1])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.6 : torch.Size([1, 12, 12])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.7 : torch.Size([12, 8, 20])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.8 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.9 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.10 : torch.Size([20, 8, 12])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.11 : torch.Size([12, 12, 1])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.12 : torch.Size([12])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.13 : torch.Size([20])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.14 : torch.Size([20])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.15 : torch.Size([20])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.16 : torch.Size([12])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.17 : torch.Size([12, 1])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.18 : torch.Size([20, 1])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.19 : torch.Size([20, 1])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.20 : torch.Size([20, 1])
+encoder.layer_stack.1.slf_attn.w_ks.tensor.trainable_variables.21 : torch.Size([12, 1])
+encoder.layer_stack.1.slf_attn.w_vs.bias : torch.Size([768])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.0 : torch.Size([1, 12, 12])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.1 : torch.Size([12, 8, 20])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.2 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.3 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.4 : torch.Size([20, 8, 12])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.5 : torch.Size([12, 12, 1])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.6 : torch.Size([1, 12, 12])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.7 : torch.Size([12, 8, 20])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.8 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.9 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.10 : torch.Size([20, 8, 12])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.11 : torch.Size([12, 12, 1])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.12 : torch.Size([12])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.13 : torch.Size([20])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.14 : torch.Size([20])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.15 : torch.Size([20])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.16 : torch.Size([12])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.17 : torch.Size([12, 1])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.18 : torch.Size([20, 1])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.19 : torch.Size([20, 1])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.20 : torch.Size([20, 1])
+encoder.layer_stack.1.slf_attn.w_vs.tensor.trainable_variables.21 : torch.Size([12, 1])
+encoder.layer_stack.1.slf_attn.fc.bias : torch.Size([768])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.0 : torch.Size([1, 12, 12])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.1 : torch.Size([12, 8, 20])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.2 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.3 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.4 : torch.Size([20, 8, 12])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.5 : torch.Size([12, 12, 1])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.6 : torch.Size([1, 12, 12])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.7 : torch.Size([12, 8, 20])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.8 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.9 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.10 : torch.Size([20, 8, 12])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.11 : torch.Size([12, 12, 1])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.12 : torch.Size([12])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.13 : torch.Size([20])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.14 : torch.Size([20])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.15 : torch.Size([20])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.16 : torch.Size([12])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.17 : torch.Size([12, 1])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.18 : torch.Size([20, 1])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.19 : torch.Size([20, 1])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.20 : torch.Size([20, 1])
+encoder.layer_stack.1.slf_attn.fc.tensor.trainable_variables.21 : torch.Size([12, 1])
+encoder.layer_stack.1.slf_attn.layer_norm.weight : torch.Size([768])
+encoder.layer_stack.1.slf_attn.layer_norm.bias : torch.Size([768])
+encoder.layer_stack.1.pos_ffn.fc_1.bias : torch.Size([3072])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.0 : torch.Size([1, 12, 12])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.1 : torch.Size([12, 8, 20])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.2 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.3 : torch.Size([20, 12, 20])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.4 : torch.Size([20, 16, 16])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.5 : torch.Size([16, 16, 1])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.6 : torch.Size([1, 12, 12])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.7 : torch.Size([12, 8, 20])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.8 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.9 : torch.Size([20, 12, 20])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.10 : torch.Size([20, 16, 16])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.11 : torch.Size([16, 16, 1])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.12 : torch.Size([12])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.13 : torch.Size([20])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.14 : torch.Size([20])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.15 : torch.Size([20])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.16 : torch.Size([16])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.17 : torch.Size([12, 1])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.18 : torch.Size([20, 1])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.19 : torch.Size([20, 1])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.20 : torch.Size([20, 1])
+encoder.layer_stack.1.pos_ffn.fc_1.tensor.trainable_variables.21 : torch.Size([16, 1])
+encoder.layer_stack.1.pos_ffn.fc_2.bias : torch.Size([768])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.0 : torch.Size([1, 16, 16])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.1 : torch.Size([16, 16, 20])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.2 : torch.Size([20, 12, 20])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.3 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.4 : torch.Size([20, 8, 12])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.5 : torch.Size([12, 12, 1])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.6 : torch.Size([1, 16, 16])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.7 : torch.Size([16, 16, 20])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.8 : torch.Size([20, 12, 20])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.9 : torch.Size([20, 8, 20])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.10 : torch.Size([20, 8, 12])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.11 : torch.Size([12, 12, 1])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.12 : torch.Size([16])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.13 : torch.Size([20])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.14 : torch.Size([20])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.15 : torch.Size([20])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.16 : torch.Size([12])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.17 : torch.Size([16, 1])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.18 : torch.Size([20, 1])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.19 : torch.Size([20, 1])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.20 : torch.Size([20, 1])
+encoder.layer_stack.1.pos_ffn.fc_2.tensor.trainable_variables.21 : torch.Size([12, 1])
+encoder.layer_stack.1.pos_ffn.layer_norm.weight : torch.Size([768])
+encoder.layer_stack.1.pos_ffn.layer_norm.bias : torch.Size([768])
+encoder.layer_norm.weight : torch.Size([768])
+encoder.layer_norm.bias : torch.Size([768])
+preclassifier.bias : torch.Size([768])
+preclassifier.tensor.trainable_variables.0 : torch.Size([1, 12, 12])
+preclassifier.tensor.trainable_variables.1 : torch.Size([12, 8, 20])
+preclassifier.tensor.trainable_variables.2 : torch.Size([20, 8, 20])
+preclassifier.tensor.trainable_variables.3 : torch.Size([20, 8, 20])
+preclassifier.tensor.trainable_variables.4 : torch.Size([20, 8, 12])
+preclassifier.tensor.trainable_variables.5 : torch.Size([12, 12, 1])
+preclassifier.tensor.trainable_variables.6 : torch.Size([1, 12, 12])
+preclassifier.tensor.trainable_variables.7 : torch.Size([12, 8, 20])
+preclassifier.tensor.trainable_variables.8 : torch.Size([20, 8, 20])
+preclassifier.tensor.trainable_variables.9 : torch.Size([20, 8, 20])
+preclassifier.tensor.trainable_variables.10 : torch.Size([20, 8, 12])
+preclassifier.tensor.trainable_variables.11 : torch.Size([12, 12, 1])
+preclassifier.tensor.trainable_variables.12 : torch.Size([12])
+preclassifier.tensor.trainable_variables.13 : torch.Size([20])
+preclassifier.tensor.trainable_variables.14 : torch.Size([20])
+preclassifier.tensor.trainable_variables.15 : torch.Size([20])
+preclassifier.tensor.trainable_variables.16 : torch.Size([12])
+preclassifier.tensor.trainable_variables.17 : torch.Size([12, 1])
+preclassifier.tensor.trainable_variables.18 : torch.Size([20, 1])
+preclassifier.tensor.trainable_variables.19 : torch.Size([20, 1])
+preclassifier.tensor.trainable_variables.20 : torch.Size([20, 1])
+preclassifier.tensor.trainable_variables.21 : torch.Size([12, 1])
+slot_preclassifier.bias : torch.Size([768])
+slot_preclassifier.tensor.trainable_variables.0 : torch.Size([1, 12, 12])
+slot_preclassifier.tensor.trainable_variables.1 : torch.Size([12, 8, 20])
+slot_preclassifier.tensor.trainable_variables.2 : torch.Size([20, 8, 20])
+slot_preclassifier.tensor.trainable_variables.3 : torch.Size([20, 8, 20])
+slot_preclassifier.tensor.trainable_variables.4 : torch.Size([20, 8, 12])
+slot_preclassifier.tensor.trainable_variables.5 : torch.Size([12, 12, 1])
+slot_preclassifier.tensor.trainable_variables.6 : torch.Size([1, 12, 12])
+slot_preclassifier.tensor.trainable_variables.7 : torch.Size([12, 8, 20])
+slot_preclassifier.tensor.trainable_variables.8 : torch.Size([20, 8, 20])
+slot_preclassifier.tensor.trainable_variables.9 : torch.Size([20, 8, 20])
+slot_preclassifier.tensor.trainable_variables.10 : torch.Size([20, 8, 12])
+slot_preclassifier.tensor.trainable_variables.11 : torch.Size([12, 12, 1])
+slot_preclassifier.tensor.trainable_variables.12 : torch.Size([12])
+slot_preclassifier.tensor.trainable_variables.13 : torch.Size([20])
+slot_preclassifier.tensor.trainable_variables.14 : torch.Size([20])
+slot_preclassifier.tensor.trainable_variables.15 : torch.Size([20])
+slot_preclassifier.tensor.trainable_variables.16 : torch.Size([12])
+slot_preclassifier.tensor.trainable_variables.17 : torch.Size([12, 1])
+slot_preclassifier.tensor.trainable_variables.18 : torch.Size([20, 1])
+slot_preclassifier.tensor.trainable_variables.19 : torch.Size([20, 1])
+slot_preclassifier.tensor.trainable_variables.20 : torch.Size([20, 1])
+slot_preclassifier.tensor.trainable_variables.21 : torch.Size([12, 1])
+classifier.3.weight : torch.Size([22, 768])
+classifier.3.bias : torch.Size([22])
+slot_classifier.2.weight : torch.Size([768])
+slot_classifier.2.bias : torch.Size([768])
+slot_classifier.3.weight : torch.Size([121, 768])
+slot_classifier.3.bias : torch.Size([121])
+{'Total': 970039, 'Trainable': 749607}
+=> Using a preset learning rate schedule:
+{0: 0.001, 10: 0.0001, 30: 1e-05}

@@ -271,31 +271,31 @@ r = 20
 r_attn = 20
 
 # ========= Yequan's TensorTrainMatrix Version ========= #
-attention_shape = [[[12,8,8],[8,8,12]], [[12,8,8],[8,8,12]]]
-attention_rank = [[1,r_attn,r_attn,1], [1,r_attn,r_attn,1]]
-attention_tensor_type = 'TensorTrainMatrix'
+# attention_shape = [[[12,8,8],[8,8,12]], [[12,8,8],[8,8,12]]]
+# attention_rank = [[1,r_attn,r_attn,1], [1,r_attn,r_attn,1]]
+# attention_tensor_type = 'TensorTrainMatrix'
 
-ffn_shape = [[[12,8,8],[12,16,16]], [[16,16,12],[8,8,12]]]
-ffn_rank = [[1,r,r,1], [1,r,r,1]]
+# ffn_shape = [[[12,8,8],[12,16,16]], [[16,16,12],[8,8,12]]]
+# ffn_rank = [[1,r,r,1], [1,r,r,1]]
 
-ffn_tensor_type = 'TensorTrainMatrix'
+# ffn_tensor_type = 'TensorTrainMatrix'
 
-classifier_shape = [[12,8,8], [8,8,12]]
-classifier_rank = [1,r,r,1]
-classifier_tensor_type = 'TensorTrainMatrix'
+# classifier_shape = [[12,8,8], [8,8,12]]
+# classifier_rank = [1,r,r,1]
+# classifier_tensor_type = 'TensorTrainMatrix'
 
 # ========= Zi Yang's TensorTrain Version ========= #
-# attention_shape = [[12,8,8,8,8,12],[12,8,8,8,8,12]]
-# attention_rank = [[1,12,r_attn,r_attn,r_attn,12,1], [1,12,r_attn,r_attn,r_attn,12,1]]
-# attention_tensor_type = 'TensorTrain'
+attention_shape = [[12,8,8,8,8,12],[12,8,8,8,8,12]]
+attention_rank = [[1,12,r_attn,r_attn,r_attn,12,1], [1,12,r_attn,r_attn,r_attn,12,1]]
+attention_tensor_type = 'TensorTrain'
 
-# ffn_shape = [[12,8,8,12,16,16],[16,16,12,8,8,12]]
-# ffn_rank = [[1,12,r,r,r,16,1], [1,16,r,r,r,12,1]]
-# ffn_tensor_type = 'TensorTrain'
+ffn_shape = [[12,8,8,12,16,16],[16,16,12,8,8,12]]
+ffn_rank = [[1,12,r,r,r,16,1], [1,16,r,r,r,12,1]]
+ffn_tensor_type = 'TensorTrain'
 
-# classifier_shape = [12,8,8,8,8,12]
-# classifier_rank = [1,12,r,r,r,12,1]
-# classifier_tensor_type = 'TensorTrain'
+classifier_shape = [12,8,8,8,8,12]
+classifier_rank = [1,12,r,r,r,12,1]
+classifier_tensor_type = 'TensorTrain'
 
 # ========= Quant ========= #
 
@@ -418,11 +418,11 @@ def main():
     # load config *.yml file
     # recursive: also load default.yaml
     configs.load(opt.config, recursive=False)
-
+    
     # ================== Prepare logger ==========================
     paths = [configs.GraSP.dataset]
-    summn = [configs.GraSP.exp_name, configs.optimizer.name]
-    chekn = [configs.GraSP.exp_name, configs.optimizer.name]
+    summn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.exp_name]
+    chekn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.exp_name]
     if configs.run.runs is not None:
         summn.append('run_%s' % configs.run.runs)
         chekn.append('run_%s' % configs.run.runs)
@@ -442,18 +442,11 @@ def main():
     t_batch = next(iter(training_data))
     targets, inputs, slot_label,attn,seg = map(lambda x: x.to(device), t_batch)
     
-    writer.add_graph(model, (inputs,attn,seg))
-    writer.close()
-    for name,parameters in model.named_parameters():
-        print(name,':',parameters.size())
+    # writer.add_graph(model, (inputs,attn,seg))
+    # writer.close()
+    # for name,parameters in model.named_parameters():
+    #     print(name,':',parameters.size())
 
-    print(get_parameter_number(model))
-    # stat(model, (inputs,attn,seg))
-
-    # ====================================== build ModelBase ======================================
-    # first three: only used for 
-    mb = ModelBase(configs.GraSP.network, configs.GraSP.depth, configs.GraSP.dataset, model)
-    mb.cuda()
 
     # ====================================== fetch configs ======================================
     ckpt_path = configs.GraSP.checkpoint_dir
@@ -477,13 +470,19 @@ def main():
                 (normalize, num_iterations, target_ratio, ratio))
 
     # ====================================== start pruning ======================================
+    # we need: model, mb, masks, named_masks
     iteration = 0
+    # Need pruning
     if configs.GraSP.pruner != False:
         logger.info('** Target ratio: %.4f, iter ratio: %.4f, iteration: %d/%d.' % (target_ratio,
                                                                                     ratio,
                                                                                     1,
                                                                                     num_iterations))
 
+        # ====================================== build ModelBase ====================================== 
+        model = transformer
+        mb = ModelBase(configs.GraSP.network, configs.GraSP.depth, configs.GraSP.dataset, model)
+        mb.cuda()
         mb.model.apply(weights_init)
         print("=> Applying weight initialization(%s)." % configs.GraSP.get('init_method', 'kaiming'))
         print("Iteration of: %d/%d" % (iteration, num_iterations))
@@ -521,8 +520,30 @@ def main():
         print_mask_information(mb, logger)
         # logger.info('  LR: %.5f, WD: %.5f, Epochs: %d' %
         #             (learning_rates[iteration], weight_decays[iteration], training_epochs[iteration]))
+    # no need to prune this time, check whether incre
     else:
-        named_masks = None
+        # ================== Pre-trained model ==========================
+        if configs.pretrained.incre == True:
+            if configs.pretrained.pruner != False:
+                model_state = torch.load(configs.pretrained.load_model_path)
+                model = model_state['model']
+                masks = model_state['masks']
+                named_masks = model_state['named_masks']
+            else:
+                model = torch.load(configs.pretrained.load_model_path)
+                masks = None
+                named_masks = None
+        # ================== No Pre-trained model ==========================
+        else:
+            model = transformer
+            masks = None
+            named_masks = None
+        
+        mb = ModelBase(configs.GraSP.network, configs.GraSP.depth, configs.GraSP.dataset, model)
+        mb.cuda()
+    
+    print(get_parameter_number(model))
+        
     
     # valid_loss, valid_accu, valid_slot_accu = eval_epoch(transformer, validation_data, device, weight=None)
     block = transformer.encoder.layer_stack[0].slf_attn.w_qs
@@ -539,8 +560,56 @@ def main():
     # lr = 1e-3
 
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
-    optimizers = build_optimizer(configs, model, criterion, named_masks, learning_rates, weight_decays)
-    lr_schedulers = build_scheduler(configs, optimizers, learning_rates)
+    
+    if configs.optimizer.name == 'ZO_SCD_mask':
+        optimizer_notensor = ZO_SCD_mask(
+                model = model, 
+                criterion = criterion,
+                masks = named_masks,
+                lr = learning_rates,
+                grad_sparsity = configs.optimizer.grad_sparsity,
+                tensorized = 'None'
+            )
+        optimizer_tensor = ZO_SCD_mask(
+                model = model, 
+                criterion = criterion,
+                masks = named_masks,
+                lr = learning_rates,
+                grad_sparsity = configs.optimizer.grad_sparsity,
+                tensorized = configs.model.tensorized
+            )
+    elif configs.optimizer.name == 'ZO_SGD_mask':
+        optimizer_notensor = ZO_SGD_mask(
+            model = model, 
+            criterion = criterion,
+            masks = named_masks,
+            lr = learning_rates,
+            sigma = configs.optimizer.sigma,
+            n_sample  = configs.optimizer.n_sample,
+            signSGD = configs.optimizer.signSGD,
+            layer_by_layer = configs.optimizer.layer_by_layer,
+            tensorized = 'None'
+        )
+        optimizer_tensor = ZO_SGD_mask(
+            model = model, 
+            criterion = criterion,
+            masks = named_masks,
+            lr = learning_rates,
+            sigma = configs.optimizer.sigma,
+            n_sample  = configs.optimizer.n_sample,
+            signSGD = configs.optimizer.signSGD,
+            layer_by_layer = configs.optimizer.layer_by_layer,
+            tensorized = configs.model.tensorized
+        )
+    elif  configs.optimizer.name == 'ADAM':
+        optimizer_tensor = optim.Adam(filter(lambda x: x.requires_grad, tensor_blocks.parameters()),betas=(0.9, 0.98), eps=1e-06, lr = learning_rates)
+        optimizer_notensor = optim.Adam(layer_notensor.parameters(), betas=(0.9, 0.98), eps=1e-06, lr = learning_rates)
+    else:
+        raise ValueError(f"Wrong optimizer_name {configs.optimizer.name}") 
+
+    
+    # optimizers = build_optimizer(configs, model, criterion, named_masks, learning_rates, weight_decays)
+    lr_scheduler = build_scheduler(configs, optimizer_tensor, learning_rates)
 
     # ===================== Zi Yang's optimzier setting =====================
     
@@ -572,29 +641,42 @@ def main():
     test_result = []
     for epoch in range(training_epochs):
         # ========================== Setup Optimizer ==========================
-        # mix training selection
-        if configs.optimizer.name == 'ZO_mix':
-            if epoch < configs.optimizer.switch_epoch:
-                optimizer = optimizers[0]
-                lr_scheduler = lr_schedulers[0]
-            else:
-                optimizer = lr_schedulers[1]
-                lr_scheduler = lr_schedulers[1]
-        # single training
-        else:
-            optimizer = optimizers
-            lr_scheduler = lr_schedulers
+        # # mix training selection
+        # if configs.optimizer.name == 'ZO_mix':
+        #     if epoch < configs.optimizer.switch_epoch:
+        #         optimizer = optimizers[0]
+        #         lr_scheduler = lr_schedulers[0]
+        #     else:
+        #         optimizer = optimizers[1]
+        #         lr_scheduler = lr_schedulers[1]
+        # # single training
+        # else:
+        #     optimizer = optimizers
+        #     lr_scheduler = lr_schedulers
         
         start = time.time()
 
         # ========================== Training ==========================
-        if isinstance(lr_scheduler, PresetLRScheduler):
-            lr_scheduler(optimizer, epoch)
-            now_lr = lr_scheduler.get_lr(optimizer)
-        else:
-            now_lr = optimizer.state_dict()['param_groups'][0]['lr']
+        # if isinstance(lr_scheduler, PresetLRScheduler):
+        #     lr_scheduler(optimizer, epoch)
+        #     now_lr = lr_scheduler.get_lr(optimizer)
+        # else:
+        #     now_lr = optimizer.state_dict()['param_groups'][0]['lr']
         
-        train_loss, train_accu, train_slot_accu = train_epoch_bylayer(transformer,training_data,Loss=criterion,optimizer=optimizer,lr_scheduler=lr_scheduler,precondition=precondition,device=device,tensor_blocks=tensor_blocks,step=epoch)
+        if isinstance(lr_scheduler, PresetLRScheduler):
+            lr_scheduler(optimizer_notensor, epoch)
+            lr_scheduler(optimizer_tensor, epoch)
+            now_lr = lr_scheduler.get_lr(optimizer_tensor)
+        else:
+            pass
+        
+        train_loss, train_accu, train_slot_accu = train_epoch_bylayer(
+            transformer, training_data,
+            Loss=criterion,
+            optimizer_notensor=optimizer_notensor,
+            optimizer_tensor=optimizer_tensor,
+            precondition=precondition,device=device,tensor_blocks=tensor_blocks,
+            step=epoch)
 
         # train_loss, train_accu = 0,0
 
@@ -609,6 +691,10 @@ def main():
         train_result += [train_loss.cpu().to(torch.float32),train_accu.cpu().to(torch.float32),train_slot_accu.cpu().to(torch.float32)]
         test_result += [test_loss,test_accu.cpu().to(torch.float32),test_slot_accu]
 
+        if isinstance(lr_scheduler, PresetLRScheduler):
+            pass
+        else:
+            lr_scheduler.step()
 
         end = time.time()
 
@@ -633,17 +719,27 @@ def main():
                     loss=test_loss, accu=100*test_accu,slot_accu = 100*test_slot_accu,
                     elapse=(end-start_val)/60))
         
-        full_model_name = opt.save_model + '.chkpt'
-        torch.save(transformer.state_dict(),full_model_name)
+        # full_model_name = './model/' + configs.GraSP.exp_name + '.chkpt'
+        # torch.save(transformer.state_dict(),best_model_name)
+        # torch.save(transformer,full_model_name)
 
         if max(valid_acc_all)<valid_accu:
-            best_model_name = opt.save_model + '_best' + '.chkpt'
-            torch.save(transformer.state_dict(),best_model_name)
+            best_model_name = './model/' + configs.GraSP.exp_name + '_best' + '.chkpt'
+            # torch.save(transformer.state_dict(),best_model_name)
+            if configs.GraSP.pruner != False:
+                result = {
+                    'model': model,
+                    'masks': masks,
+                    'named_masks': named_masks
+                }
+                torch.save(result,best_model_name)
+            else:
+                torch.save(model,best_model_name)
         valid_acc_all.append(valid_accu)
-    PATH_np = opt.save_model + '.npy'
+    PATH_np = './model/' + configs.GraSP.exp_name + '.npy'
     np.save(PATH_np,np.array([train_result,test_result]))
 
-def train_epoch_bylayer(model, training_data, Loss, optimizer, lr_scheduler, tensor_blocks=None,precondition=False,device='cuda',step=1):
+def train_epoch_bylayer(model, training_data, Loss, optimizer_notensor, optimizer_tensor, tensor_blocks=None,precondition=False,device='cuda',step=1):
     ''' Epoch operation in training phase'''
 
     model.train()
@@ -669,8 +765,8 @@ def train_epoch_bylayer(model, training_data, Loss, optimizer, lr_scheduler, ten
 
         target, w1, slot_label,attn,seg= map(lambda x: x.to(device), batch)
 
-
-        optimizer.zero_grad()
+        optimizer_tensor.zero_grad()
+        optimizer_notensor.zero_grad()
 
         # attn = None
         # model.eval()
@@ -681,35 +777,29 @@ def train_epoch_bylayer(model, training_data, Loss, optimizer, lr_scheduler, ten
         inputs = (w1, attn, seg)
         targets = (target, slot_label)
 
-        if isinstance(optimizer, ZO_SCD_mask):
-            outputs, loss = optimizer.step(inputs, targets)
-        elif isinstance(optimizer, ZO_SGD_mask):
-            outputs, loss, grads_e = optimizer.step(inputs, targets, ATIS=True)
-            # test, check real grads
-            if configs.optimizer.debug == True:
-                test_optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-                
-                pred,pred_slot = model(w1,attn=attn,seg=seg)
-                pred_slot = torch.flatten(pred_slot,start_dim=0, end_dim=1)
-                slot_label = torch.flatten(slot_label,start_dim=0, end_dim=1)
+        # Forward
+        pred,pred_slot = model(w1,attn=attn,seg=seg)
+        pred_slot = torch.flatten(pred_slot,start_dim=0, end_dim=1)
+        slot_label = torch.flatten(slot_label,start_dim=0, end_dim=1)
 
-                loss_MLM =  Loss(pred_slot, slot_label)
-                loss = Loss(pred,target)  + loss_MLM
+        loss_MLM =  Loss(pred_slot, slot_label)
+        loss = Loss(pred,target)  + loss_MLM
 
-                loss = Loss(outputs, targets)
-                loss.backward()
-                test_optimizer.step()
+        # FO / ZO
+        if isinstance(optimizer_tensor, ZO_SCD_mask):
+            optimizer_tensor.step(inputs, targets, ATIS=True)
+        elif isinstance(optimizer_tensor, ZO_SGD_mask):
+            optimizer_tensor.step(inputs, targets, ATIS=True)
         else:
-            pred,pred_slot = model(w1,attn=attn,seg=seg)
-            pred_slot = torch.flatten(pred_slot,start_dim=0, end_dim=1)
-            slot_label = torch.flatten(slot_label,start_dim=0, end_dim=1)
-
-            loss_MLM =  Loss(pred_slot, slot_label)
-            loss = Loss(pred,target)  + loss_MLM
-
             loss.backward()
-            optimizer.step()
-
+            optimizer_tensor.step()
+        
+        if isinstance(optimizer_notensor, ZO_SCD_mask):
+            optimizer_notensor.step(inputs, targets, ATIS=True)
+        elif isinstance(optimizer_notensor, ZO_SGD_mask):
+            optimizer_notensor.step(inputs, targets, ATIS=True)
+        else:
+            optimizer_notensor.step()
             
         # print('ZO=',model.encoder.layer_stack[-1].slf_attn.w_ks.tensor.factors[2].grad[1,:10,1])
 
@@ -877,13 +967,6 @@ def eval_epoch(model, validation_data, device, **kwargs):
     accuracy_slot = slot_correct/slot_total
     # accuracy_slot
     return loss_per_word, accuracy, f1_score
-
-def build_obj_fn(self, data, target, model, criterion):
-    def _obj_fn():
-        y = model(data)
-        return y, criterion(y, target)
-
-    return _obj_fn
 
 
 def compute_F1(pred,target):

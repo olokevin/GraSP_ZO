@@ -13,8 +13,11 @@ def get_logger(name, logpath, filepath, package_files=[],
                displaying=True, saving=True):
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
-    log_path = logpath + name + time.strftime("-%Y%m%d-%H%M%S")
+    # log_path = logpath + name + time.strftime("-%Y%m%d-%H%M%S")
+    # makedirs(log_path)
+    log_path = logpath + name
     makedirs(log_path)
+    # log_path is a file (no / in the end)
     if saving:
         info_file_handler = logging.FileHandler(log_path)
         info_file_handler.setLevel(logging.INFO)

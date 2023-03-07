@@ -1,11 +1,11 @@
 GraSP:
-  exp_name: "MNIST_ttm_sgd_exp09_layerwise"
+  exp_name: "lr0-01_exp08_e15"
   network: ttm
   depth: 2
   dataset: mnist
   batch_size: 64
-  epoch: 25
-  learning_rate: 0.005
+  epoch: 15
+  learning_rate: 0.01
   weight_decay: 1e-4
   exception: -1
   iterations: 1
@@ -23,13 +23,13 @@ optimizer:
   sigma: 0.1
   n_sample: 10
   signSGD: False
-  layer_by_layer: True
+  layer_by_layer: False
   debug: False
   comment: 'use pos and neg, extract only data'
 
 scheduler:
   name: 'ExponentialLR'
-  gamma: 0.9
+  gamma: 0.8
   lr_schedule: {0: 1,
                 10: 0.1,
                 20: 0.01}

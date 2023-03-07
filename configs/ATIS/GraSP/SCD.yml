@@ -1,10 +1,10 @@
 GraSP:
-  exp_name: "ATIS_TTM_SCD"
+  exp_name: "ATIS_GraSP_SCD_95_incre"
   network: attn
   depth: 2
   dataset: ATIS
-  batch_size: 128
-  epoch: 50
+  batch_size: 64
+  epoch: 30
   learning_rate: 0.001
   weight_decay: 1e-4
   exception: -1
@@ -20,18 +20,21 @@ GraSP:
 
 optimizer:
   name: ZO_SCD_mask
-  grad_sparsity: 0.5
+  grad_sparsity: 0.9
 
 scheduler:
   name: 'PresetLRScheduler'
   gamma: 0.985
   lr_schedule: {0: 1,
-                10: 0.1,
-                30: 0.01}
+                5: 0.1,
+                10: 0.01}
+
+pretrained:
+  incre: True
+  load_model_path: 'model/ATIS_GraSP_FO_95_best.chkpt'
+  pruner: GraSP_attn
 
 run:
-  incre: True
-  load_model_path: 'model/ATIS_TTM_FO_best.chkpt'
   runs: None
   n_epochs: 100
   batch_size: 32
@@ -42,7 +45,7 @@ run:
   train_noise: 0
 
 model:
-  tensorized: 'TensorizedLinear_module'
+  tensorized: None
 
 checkpoint:
   save_model: "model/ATIS_notensor_2layers_FP32/GraSP_95"

@@ -1,11 +1,11 @@
 GraSP:
-  exp_name: "MNIST_ttm_scd"
+  exp_name: "lr0.01_preset_grad0"
   network: ttm
   depth: 2
   dataset: mnist
-  batch_size: 128
-  epoch: 25
-  learning_rate: 0.001
+  batch_size: 64
+  epoch: 20
+  learning_rate: 0.01
   weight_decay: 1e-4
   exception: -1
   iterations: 1
@@ -20,14 +20,17 @@ GraSP:
 
 optimizer:
   name: ZO_SCD_mask
-  grad_sparsity: 0.5
+  grad_sparsity: 0
 
 scheduler:
   name: 'PresetLRScheduler'
-  gamma: 0.985
   lr_schedule: {0: 1,
-                10: 0.1,
-                20: 0.01}
+                2: 0.1,
+                5: 0.01}
+
+# scheduler:
+#   name: 'ExponentialLR'
+#   gamma: 0.8
 
 run:
   runs: None
@@ -39,9 +42,14 @@ run:
   log_interval: 200
   train_noise: 0
 
+pretrained:
+  incre: False
+  load_model_path: 'model/ATIS_GraSP_FO_95_best.chkpt'
+  pruner: GraSP_attn
+
 model:
   tensor_type: 'TensorTrainMatrix'
-  max_rank: 8
+  max_rank: 4
   tensorized: 'TensorizedLinear_module'
 
 checkpoint:

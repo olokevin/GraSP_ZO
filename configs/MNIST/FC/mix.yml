@@ -1,16 +1,16 @@
 GraSP:
-  exp_name: "MNIST_fc_90_inc"
+  exp_name: "MNIST_fc_95_mix_gamma08_switch15"
   network: fc
   depth: 2
   dataset: mnist
   batch_size: 128
-  epoch: 10
-  learning_rate: 0.01
+  epoch: 25
+  learning_rate: 0.005
   weight_decay: 1e-4
   exception: -1
   iterations: 1
   normalize: false
-  target_ratio: 0.9
+  target_ratio: 0.95
   pruner: GraSP
   pruner_file: GraSP
   num_classes: 10
@@ -20,10 +20,21 @@ GraSP:
 
 optimizer:
   name: ZO_mix
-  change_e: 10
-  grad_sparsity: 0.5
   sigma: 0.1
-  n_samples: 10
+  n_sample: 10
+  signSGD: True
+  layer_by_layer: False
+  debug: False
+  switch_epoch: 5
+  SCD_lr: 0.001
+  grad_sparsity: 0.5
+  comment: 'signSGD + SCD'
+
+scheduler:
+  name: ZO_mix
+  gamma: 0.8
+  lr_schedule: {15: 1,
+                20: 0.1}
 
 run:
   runs: None

@@ -1,5 +1,5 @@
 GraSP:
-  exp_name: "MNIST_ttm_mix_gamma08_switch15"
+  exp_name: "MNIST_ttm_mix_gamma08_switch10"
   network: ttm
   depth: 2
   dataset: mnist
@@ -25,16 +25,16 @@ optimizer:
   signSGD: True
   layer_by_layer: False
   debug: False
-  switch_epoch: 15
+  switch_epoch: 10
   SCD_lr: 0.001
   grad_sparsity: 0.5
   comment: 'signSGD + SCD'
 
 scheduler:
-  name: 'ZO_mix'
+  name: ZO_mix
   gamma: 0.8
-  lr_schedule: {15: 1,
-                25: 0.1}
+  lr_schedule: {10: 1,
+                20: 0.1}
 
 run:
   runs: None
