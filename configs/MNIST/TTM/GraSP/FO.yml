@@ -1,37 +1,36 @@
 GraSP:
-  exp_name: "incre_lr0.001_ewise_grad0.8"
+  exp_name: "incre_GraSP_80_FO_adam"
   network: ttm
   depth: 2
   dataset: mnist
   batch_size: 64
   epoch: 10
-  learning_rate: 0.001
+  learning_rate: 0.0005
   weight_decay: 1e-4
   exception: -1
   iterations: 1
   normalize: false
   target_ratio: 0.8
-  pruner: False
-  pruner_file: False
+  pruner: GraSP
+  pruner_file: GraSP
   num_classes: 10
   samples_per_class: 10
   samples_batches: 5
   num_iters: 1
 
 optimizer:
-  name: ZO_SCD_mask
-  grad_sparsity: 0.8
-
-# scheduler:
-#   name: 'PresetLRScheduler'
-#   lr_schedule: {0: 1,
-#                 5: 0.1,
-#                 10: 0.01}
+  name: ADAM
 
 scheduler:
-  name: 'ExponentialLR'
-  gamma: 0.995
-  epoch_wise: True
+  name: 'PresetLRScheduler'
+  gamma: 0.985
+  lr_schedule: {0: 1,
+                5: 0.1}
+
+pretrained:
+  incre: True
+  load_model_path: './runs/pruning/mnist/ttm/ADAM/MNIST_ttm_FO_adam/20230308-062638/run_None/finetune_mnist_ttm2_r0.9_it0_best.pth.tar'
+  pruned: False
 
 run:
   runs: None
@@ -43,18 +42,13 @@ run:
   log_interval: 200
   train_noise: 0
 
-pretrained:
-  incre: True
-  load_model_path: './runs/pruning/mnist/ttm/ADAM/MNIST_ttm_FO_adam/20230308-062638/run_None/finetune_mnist_ttm2_r0.9_it0_best.pth.tar'
-  pruned: False
-
 model:
   tensor_type: 'TensorTrainMatrix'
   max_rank: 4
   tensorized: 'TensorizedLinear_module'
 
 checkpoint:
-  save_model: "model/MNIST_notensor_SCD"
+  save_model: "model/MNIST_notensor_2layers_FP32"
   save_mode: "best"
   proj_share_weight: 1
   label_smoothing: 1

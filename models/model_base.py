@@ -2,6 +2,7 @@ import torch.nn as nn
 from collections import OrderedDict
 # from utils.network_utils import get_network
 from utils.prune_utils import filter_weights
+from tensor_layers.layers import TensorizedLinear_module
 
 
 class ModelBase(object):
@@ -36,6 +37,18 @@ class ModelBase(object):
                         res[m] = -100.0
                         total += m.weight.numel()
                         remained += m.weight.numel()
+                elif isinstance(m, TensorizedLinear_module):
+                    mask = self.masks.get(m, None)
+                    if mask is not None:
+                        res[m] = dict()
+                        for param_name, param_mask in mask.items():
+                            res[m][param_name] = (param_mask.sum() / param_mask.numel()).item() * 100
+                            total += param_mask.numel()
+                            remained += param_mask.sum().item()
+                    else:
+                        res[m] = -100.0
+                        total += m.weight.numel()
+                        remained += m.weight.numel()
             res['ratio'] = remained/total * 100
             return res
 
@@ -59,14 +72,15 @@ class ModelBase(object):
             res[m] = filter_weights(m.weight, 1-self.masks[m])
         return res
 
-    def register_mask(self, masks=None):
+    def register_mask(self, masks=None, forward_hook=True):
         # self.masks = None
         self.unregister_mask()
         if masks is not None:
             self.masks = masks
         assert self.masks is not None, 'Masks should be generated first.'
-        for m in self.masks.keys():
-            m.register_forward_pre_hook(self._forward_pre_hooks)
+        if forward_hook == True:
+            for m in self.masks.keys():
+                m.register_forward_pre_hook(self._forward_pre_hooks)
 
     def unregister_mask(self):
         for m in self.model.modules():
@@ -78,6 +92,11 @@ class ModelBase(object):
             # import pdb; pdb.set_trace()
             mask = self.masks[m]
             m.weight.data.mul_(mask)
+        elif isinstance(m, TensorizedLinear_module):
+            layer_mask = self.masks[m]
+            for idx in range(m.tensor.order):
+                factor_mask = layer_mask[str(idx)]
+                m.tensor.factors[idx].data.mul_(factor_mask)
         else:
             raise NotImplementedError('Unsupported ' + m)
 

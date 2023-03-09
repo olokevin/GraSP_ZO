@@ -71,7 +71,11 @@ def print_mask_information(mb, logger):
     for k, v in ratios.items():
         if k == 'ratio':
             continue
-        logger.info('  (%d) %s: Remaining: %.2f%%' % (count, k, v))
+        if isinstance(v, dict):
+            v_ratio = sum(v.values())
+        else:
+            v_ratio = v
+        logger.info('  (%d) %s: Remaining: %.2f%%' % (count, k, v_ratio))
         count += 1
 
 
@@ -207,84 +211,9 @@ def train_once(mb, net, named_masks, trainloader, testloader, writer, config, ck
     
     # ================== optimizer ======================
     optimizers = build_optimizer(config, net, criterion, named_masks, learning_rate, weight_decay)
-    # if config.optimizer.name == 'ZO_SCD_mask':
-    #     net.requires_grad_(False)
-    #     optimizer = ZO_SCD_mask(
-    #         model = net, 
-    #         criterion = criterion,
-    #         masks = named_masks,
-    #         lr = learning_rate,
-    #         grad_sparsity = config.optimizer.grad_sparsity,
-    #         tensorized = config.model.tensorized
-    #     )
-    # elif config.optimizer.name == 'ZO_SGD_mask':
-    #     if config.optimizer.debug == True:
-    #         net.requires_grad_(True)
-    #     else:
-    #         net.requires_grad_(False)
-    #     optimizer = ZO_SGD_mask(
-    #         model = net, 
-    #         criterion = criterion,
-    #         masks = named_masks,
-    #         lr = learning_rate,
-    #         sigma = config.optimizer.sigma,
-    #         n_sample  = config.optimizer.n_sample,
-    #         signSGD = config.optimizer.signSGD,
-    #         layer_by_layer = config.optimizer.layer_by_layer,
-    #         tensorized = config.model.tensorized
-    #     )
-    # elif config.optimizer.name == 'ZO_mix':
-    #     optimizer_SGD = ZO_SGD_mask(
-    #         model = net, 
-    #         criterion = criterion,
-    #         masks = named_masks,
-    #         lr = learning_rate,
-    #         sigma = config.optimizer.sigma,
-    #         n_sample  = config.optimizer.n_sample,
-    #         signSGD = config.optimizer.signSGD,
-    #         layer_by_layer = config.optimizer.layer_by_layer,
-    #         tensorized = config.model.tensorized
-    #     )
-    #     optimizer_SCD = ZO_SCD_mask(
-    #         model = net, 
-    #         criterion = criterion,
-    #         masks = named_masks,
-    #         lr = config.optimizer.SCD_lr,
-    #         grad_sparsity = config.optimizer.grad_sparsity,
-    #         tensorized = config.model.tensorized
-    #     )
-    #     optimizer = optimizer_SGD
-    # elif config.optimizer.name == 'SGD':
-    #     optimizer = optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9, weight_decay=weight_decay)
-    # elif config.optimizer.name == 'ADAM':
-    #     # optimizer = optim.Adam(list(net.parameters()), lr=learning_rate, weight_decay=weight_decay)
-    #     optimizer = optim.Adam(net.parameters(), betas=(0.9, 0.98), eps=1e-06, lr = learning_rate)
-    # else:
-    #     raise ValueError(f"Wrong optimizer_name {config.optimizer.name}")    
     
     # ================== scheduler ======================
-    
     lr_schedulers = build_scheduler(config, optimizers, learning_rate)
-
-    # if config.scheduler.name == 'PresetLRScheduler':
-    #     lr_schedule = dict()
-    #     for n_epoch,lr_coef in dict(config.scheduler.lr_schedule).items():
-    #         lr_schedule[n_epoch] = learning_rate * lr_coef
-    
-    #     lr_scheduler = PresetLRScheduler(lr_schedule)
-    # elif config.scheduler.name == 'ExponentialLR':
-    #     lr_scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=config.scheduler.gamma)
-    # elif config.scheduler.name == 'ZO_mix':
-    #     lr_scheduler_SGD = optim.lr_scheduler.ExponentialLR(optimizer, gamma=config.scheduler.gamma)
-    #     lr_schedule = dict()
-    #     for n_epoch,lr_coef in dict(config.scheduler.lr_schedule).items():
-    #         lr_schedule[n_epoch] = config.optimizer.SCD_lr * lr_coef
-    
-    #     lr_scheduler_SCD = PresetLRScheduler(lr_schedule)
-
-    #     lr_scheduler = lr_scheduler_SGD
-    # else:
-    #     raise ValueError(f"Wrong scheduler_name {config.scheduler.name}")    
     
     best_acc = 0
     best_epoch = 0
@@ -361,8 +290,8 @@ def main():
 
     # ================== Prepare logger ==========================
     paths = [configs.GraSP.dataset]
-    summn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
-    chekn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
+    summn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.pruner, configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
+    chekn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.pruner, configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
     if configs.run.runs is not None:
         summn.append('run_%s/' % configs.run.runs)
         chekn.append('run_%s/' % configs.run.runs)
@@ -377,7 +306,7 @@ def main():
     print("=> config.checkpoint_dir: %s" % configs.GraSP.checkpoint_dir)
 
     logger, writer = init_logger(configs.GraSP)
-    logger.info(dict(configs))
+    # logger.info(dict(configs))
     logger.info(dict(configs.GraSP))
     logger.info(dict(configs.optimizer))
     logger.info(dict(configs.scheduler))
@@ -415,76 +344,85 @@ def main():
     # ====================================== Prepare model ======================================
     iteration = 0
     
+    # has pretrained model
     if hasattr(configs, 'pretrained') and configs.pretrained.incre == True:
         model_state = torch.load(configs.pretrained.load_model_path)
         model = model_state['net']
         logger.info('Pre-trained model accuracy: %.4f ' % model_state['acc'])
-
-        # ================== build ModelBase ==================
-        mb = ModelBase(configs.GraSP.network, configs.GraSP.depth, configs.GraSP.dataset, model)
-        mb.cuda()
-
-        if hasattr(configs.pretrained, 'pruned') and configs.pretrained.pruned == True:
-            masks = model_state['masks']
-            named_masks = model_state['named_masks']
-        else:
-            masks = None
-            named_masks = None
-
-    else:   # from scratch
-        # ================== Model ==================
+    # from scratch
+    else: 
         model = build_model(configs)
+    
+    # build ModelBase 
+    mb = ModelBase(configs.GraSP.network, configs.GraSP.depth, configs.GraSP.dataset, model)
+    mb.cuda()
 
-        # ================== build ModelBase ==================
-        mb = ModelBase(configs.GraSP.network, configs.GraSP.depth, configs.GraSP.dataset, model)
-        mb.cuda()
-        
+    # ====================================== Pruning Masks ======================================
+    # @ToDo: check whether this attribute exists
+    # if hasattr(configs, 'pretrained') and hasattr(configs.pretrained, 'pretrained'):
+    
+    # has pretrained pruned masks:
+    if hasattr(configs, 'pretrained') and configs.pretrained.incre == True and configs.pretrained.pruned == True:
+        masks = model_state['masks']
+        named_masks = model_state['named_masks']
+    # generate mask this time
+    elif configs.GraSP.pruner != False:
         # ================== start pruning ==================
-        if configs.GraSP.pruner != False:
-            logger.info('** Target ratio: %.4f, iter ratio: %.4f, iteration: %d/%d.' % (target_ratio,
-                                                                                        ratio,
-                                                                                        1,
-                                                                                        num_iterations))
+        
+        logger.info('** Target ratio: %.4f, iter ratio: %.4f, iteration: %d/%d.' % (target_ratio,
+                                                                                    ratio,
+                                                                                    1,
+                                                                                    num_iterations))
 
+        if hasattr(configs, 'pretrained') and configs.pretrained.incre == True:
+            pass
+        else:
             mb.model.apply(weights_init)
             print("=> Applying weight initialization(%s)." % configs.GraSP.get('init_method', 'kaiming'))
-            print("Iteration of: %d/%d" % (iteration, num_iterations))
+        
+        print("Iteration of: %d/%d" % (iteration, num_iterations))
 
-            masks, named_masks = GraSP_zo_mask(mb.model, ratio, trainloader, 'cuda',
-                          num_classes=configs.GraSP.num_classes,
-                          samples_per_class=configs.GraSP.samples_per_class,
-                          num_iters=configs.GraSP.num_iters)
-            iteration = 0
-            print('=> Using GraSP')
-            # ========== register mask ==================
-            mb.register_mask(masks)
-            # ========== save pruned network ============
-            logger.info('Saving..')
-            state = {
-                'net': mb.model,
-                'acc': -1,
-                'epoch': -1,
-                'args': configs.GraSP,
-                'mask': mb.masks,
-                'ratio': mb.get_ratio_at_each_layer()
-            }
-            path = os.path.join(ckpt_path, 'prune_%s_%s%s_r%s_it%d.pth.tar' % (configs.GraSP.dataset,
-                                                                                configs.GraSP.network,
-                                                                                configs.GraSP.depth,
-                                                                                configs.GraSP.target_ratio,
-                                                                                iteration))
-            torch.save(state, path)
-
-            # ========== print pruning details ============
-            logger.info('**[%d] Mask and training setting: ' % iteration)
-            print_mask_information(mb, logger)
-            # logger.info('  LR: %.5f, WD: %.5f, Epochs: %d' %
-            #             (learning_rates[iteration], weight_decays[iteration], training_epochs[iteration]))
+        masks, named_masks = GraSP_zo_mask(mb.model, ratio, trainloader, 'cuda',
+                      num_classes=configs.GraSP.num_classes,
+                      samples_per_class=configs.GraSP.samples_per_class,
+                      num_iters=configs.GraSP.num_iters,
+                      tensorized=configs.model.tensorized)
+        iteration = 0
+        print('=> Using GraSP')
+        # ========== register mask ==================
+        # pretrained model, do not register forward hook (remain original value)
+        if hasattr(configs, 'pretrained') and configs.pretrained.incre == True:
+            mb.register_mask(masks, forward_hook=False)
+        # from scratch, register forward hook (keep pruned params as 0)
         else:
-            masks = None
-            named_masks = None
+            mb.register_mask(masks, forward_hook=True)
+        # ========== save pruned network ============
+        logger.info('Saving..')
+        state = {
+            'net': mb.model,
+            'acc': -1,
+            'epoch': -1,
+            'args': configs.GraSP,
+            'mask': mb.masks,
+            'ratio': mb.get_ratio_at_each_layer()
+        }
+        path = os.path.join(ckpt_path, 'prune_%s_%s%s_r%s_it%d.pth.tar' % (configs.GraSP.dataset,
+                                                                            configs.GraSP.network,
+                                                                            configs.GraSP.depth,
+                                                                            configs.GraSP.target_ratio,
+                                                                            iteration))
+        torch.save(state, path)
+
+        # ========== print pruning details ============
+        logger.info('**[%d] Mask and training setting: ' % iteration)
+        print_mask_information(mb, logger)
+        # logger.info('  LR: %.5f, WD: %.5f, Epochs: %d' %
+        #             (learning_rates[iteration], weight_decays[iteration], training_epochs[iteration]))
+    else:
+        masks = None
+        named_masks = None
     # ======================= Training =======================
-    print(get_parameter_number(model))
+    logger.info(configs.GraSP.exp_name)
     train_once( mb=mb,
                 net=mb.model,
                 named_masks = named_masks,

@@ -39,7 +39,7 @@ run:
   train_noise: 0
 
 model:
-  tensorized: 0
+  tensorized: False
 
 checkpoint:
   save_model: "model/MNIST_notensor_2layers_FP32"

@@ -353,6 +353,7 @@ class TensorizedLinear_module(nn.Module):
 
     def update_rank_parameters(self):
         self.tensor.update_rank_parameters()
+        
 
 
 

@@ -7,6 +7,8 @@ import math
 import copy
 import types
 
+from tensor_layers.layers import TensorizedLinear_module
+
 
 def GraSP_fetch_data(dataloader, num_classes, samples_per_class):
     datas = [[] for _ in range(num_classes)]
@@ -46,7 +48,9 @@ def count_fc_parameters(net):
     return total
 
 
-def GraSP_zo_mask(net, ratio, train_dataloader, device, num_classes=10, samples_per_class=25, num_iters=1, T=200, reinit=True):
+def GraSP_zo_mask(net, ratio, train_dataloader, device, 
+                  num_classes=10, samples_per_class=25, num_iters=1, T=200, 
+                  reinit=True, tensorized=False):
     eps = 1e-10
     keep_ratio = 1-ratio
     old_net = net
@@ -58,12 +62,22 @@ def GraSP_zo_mask(net, ratio, train_dataloader, device, num_classes=10, samples_
     total_parameters = count_total_parameters(net)
     fc_parameters = count_fc_parameters(net)
 
-    # rescale_weights(net)
-    for layer in net.modules():
-        if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear):
-            if isinstance(layer, nn.Linear) and reinit:
-                nn.init.xavier_normal(layer.weight)
-            weights.append(layer.weight)
+    # ================== Extract model parameters ==================
+    if tensorized == 'TensorizedLinear_module':
+        print('GraSP on TensorizedLinear_module')
+        for layer in net.modules():
+            if isinstance(layer, TensorizedLinear_module):
+                for i in range(layer.tensor.order):
+                    weights.append(layer.tensor.factors[i])
+    else:
+        # rescale_weights(net)
+        print('GraSP on nn.Linear and nn.Conv2d')
+        for layer in net.modules():
+            if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear):
+                if isinstance(layer, nn.Linear) and reinit:
+                    nn.init.xavier_normal(layer.weight)
+                weights.append(layer.weight)
+    
 
     inputs_one = []
     targets_one = []
@@ -128,25 +142,48 @@ def GraSP_zo_mask(net, ratio, train_dataloader, device, num_classes=10, samples_
         z = 0
         count = 0
         for layer in net.modules():
-            if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear):
-                z += (grad_w[count].data * grad_f[count]).sum()
-                count += 1
+            if tensorized == 'TensorizedLinear_module':
+                if isinstance(layer, TensorizedLinear_module):
+                    for i in range(layer.tensor.order):
+                        z += (grad_w[count].data * grad_f[count]).sum()
+                        count += 1
+            else:
+                if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear):
+                    z += (grad_w[count].data * grad_f[count]).sum()
+                    count += 1
         z.backward()
 
     grads = dict()
+    named_grads = dict()
     old_modules = list(old_net.modules())
-    for idx, layer in enumerate(net.modules()):
-        if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear):
-            grads[old_modules[idx]] = -layer.weight.data * layer.weight.grad  # -theta_q Hg
+    for idx, (layer_name, layer) in enumerate(net.named_modules()):
+        if tensorized == 'TensorizedLinear_module':
+            if isinstance(layer, TensorizedLinear_module):
+                layer_grads = {
+                    str(i): -layer.tensor.factors[i].data * layer.tensor.factors[i].grad
+                    for i in range(layer.tensor.order)
+                }
+                grads[old_modules[idx]] = layer_grads
+                named_grads[layer_name] = layer_grads
+        else: 
+            if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear):
+                grads[old_modules[idx]] = -layer.weight.data * layer.weight.grad  # -theta_q Hg
+                named_grads[layer_name] = -layer.weight.data * layer.weight.grad
 
     # =============== for ZO optimizer ===============
-    named_grads = dict()
-    for layer_name, layer in net.named_modules():
-        if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear):
-            named_grads[layer_name] = -layer.weight.data * layer.weight.grad  # -theta_q Hg
+    # named_grads = dict()
+    # for layer_name, layer in net.named_modules():
+    #     if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear):
+    #         named_grads[layer_name] = -layer.weight.data * layer.weight.grad  # -theta_q Hg
     
     # Gather all scores in a single vector and normalise
-    all_scores = torch.cat([torch.flatten(x) for x in grads.values()])
+    all_scores = torch.cat(
+        [ torch.flatten(x) if torch.is_tensor(x)
+          else torch.cat(
+            [torch.flatten(x_v) for x_v in x.values()]
+          )
+          for x in grads.values()]
+    )
     norm_factor = torch.abs(torch.sum(all_scores)) + eps
     print("** norm factor:", norm_factor)
     all_scores.div_(norm_factor)
@@ -157,14 +194,26 @@ def GraSP_zo_mask(net, ratio, train_dataloader, device, num_classes=10, samples_
     acceptable_score = threshold[-1]
     print('** accept: ', acceptable_score)
     keep_masks = dict()
-    for m, g in grads.items():
-        keep_masks[m] = ((g / norm_factor) <= acceptable_score).float()
+    for layer, g in grads.items():
+        if tensorized == 'TensorizedLinear_module':
+            layer_mask = dict()
+            for g_name, g_factor in g.items():
+                layer_mask[g_name] = ((g_factor / norm_factor) <= acceptable_score).float()
+            keep_masks[layer] = layer_mask
+        else:
+            keep_masks[layer] = ((g / norm_factor) <= acceptable_score).float()
     
     # =============== for ZO optimizer ===============
     named_keep_masks = dict()
-    for m, g in named_grads.items():
-        named_keep_masks[m] = {'weight': ((g / norm_factor) <= acceptable_score).float()}
+    for layer_name, g in named_grads.items():
+        if tensorized == 'TensorizedLinear_module':
+            layer_mask = dict()
+            for g_name, g_factor in g.items():
+                layer_mask[g_name] = ((g_factor / norm_factor) <= acceptable_score).float()
+            named_keep_masks[layer_name] = layer_mask
+        else:
+            named_keep_masks[layer_name] = {'weight': ((g / norm_factor) <= acceptable_score).float()}
 
-    print(torch.sum(torch.cat([torch.flatten(x == 1) for x in keep_masks.values()])))
+    # print(torch.sum(torch.cat([torch.flatten(x == 1) for x in keep_masks.values()])))
 
     return keep_masks, named_keep_masks
