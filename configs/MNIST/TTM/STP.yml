@@ -1,5 +1,5 @@
 GraSP:
-  exp_name: "incre_lr0.001_ewise_grad0.8"
+  exp_name: "STP_incre_lr0.001_preset_grad0.8"
   network: ttm
   depth: 2
   dataset: mnist
@@ -21,17 +21,18 @@ GraSP:
 optimizer:
   name: ZO_SCD_mask
   grad_sparsity: 0.8
-
-# scheduler:
-#   name: 'PresetLRScheduler'
-#   lr_schedule: {0: 1,
-#                 5: 0.1,
-#                 10: 0.01}
+  STP:  True
+  patience_table: False
 
 scheduler:
-  name: 'ExponentialLR'
-  gamma: 0.995
-  epoch_wise: True
+  name: 'PresetLRScheduler'
+  lr_schedule: {0: 1,
+                2: 0.1,
+                5: 0.01}
+
+# scheduler:
+#   name: 'ExponentialLR'
+#   gamma: 0.8
 
 run:
   runs: None
@@ -44,7 +45,8 @@ run:
   train_noise: 0
 
 pretrained:
-  incre: True
+  incre: False
+  # load_model_path: './runs/pruning/mnist/ttm/ZO_SCD_mask/lr0.01_preset_grad0.5/20230307-084141/run_None/finetune_mnist_ttm2_r0.9_it0_best.pth.tar'
   load_model_path: './runs/pruning/mnist/ttm/ADAM/MNIST_ttm_FO_adam/20230308-062638/run_None/finetune_mnist_ttm2_r0.9_it0_best.pth.tar'
   pruned: False
 

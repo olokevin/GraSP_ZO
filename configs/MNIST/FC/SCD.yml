@@ -1,16 +1,16 @@
 GraSP:
-  exp_name: "MNIST_fc_99_scd"
+  exp_name: "incre_fc_95_scd_lr0.005_grad0.8"
   network: fc
   depth: 2
   dataset: mnist
   batch_size: 128
-  epoch: 20
-  learning_rate: 0.01
+  epoch: 15
+  learning_rate: 0.005
   weight_decay: 1e-4
   exception: -1
   iterations: 1
   normalize: false
-  target_ratio: 0.99
+  target_ratio: 0.95
   pruner: GraSP
   pruner_file: GraSP
   num_classes: 10
@@ -20,14 +20,21 @@ GraSP:
 
 optimizer:
   name: ZO_SCD_mask
-  grad_sparsity: 0.5
+  grad_sparsity: 0.8
 
 scheduler:
   name: 'PresetLRScheduler'
   gamma: 0.985
   lr_schedule: {0: 1,
-                10: 0.1,
-                20: 0.01}
+                2: 0.1,
+                8: 0.01}
+
+pretrained:
+  incre: True
+  load_model_path: './runs/pruning/mnist/fc/ADAM/fc_95_FO_adam/20230308-083304/run_None/finetune_mnist_fc2_r0.95_it0_best.pth.tar'
+  pruned: True
+
+
 
 run:
   runs: None

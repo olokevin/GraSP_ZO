@@ -27,7 +27,7 @@
       "env": {
         "CUDA_VISIBLE_DEVICES": "2"
       },
-      "args": ["-config", "configs/MNIST/TTM/SGD.yml"],
+      "args": ["-config", "configs/MNIST/TTM/FO.yml"],
       "justMyCode": true
     }
   ]

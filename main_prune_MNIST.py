@@ -14,12 +14,12 @@ from utils.init_utils import weights_init
 from utils.common_utils import (get_logger, makedirs, process_config, PresetLRScheduler, str_to_list)
 from utils.data_utils import get_dataloader
 from utils.network_utils import get_network
-from utils.builder import build_optimizer, build_scheduler
+from utils.builder import build_model, build_optimizer, build_scheduler
 from models.model_base import ModelBase
 from pruner.GraSP_zo_mask import GraSP_zo_mask
 
 from pyutils.config import configs
-from optimizer import ZO_SCD_mask, ZO_SGD_mask
+from optimizer import ZO_SCD_mask, ZO_SGD_mask, ZO_SCD_esti, ZO_SCD_grad
 
 # from tensor_layers.layers import TensorizedLinear_module
 # from tensor_fwd_bwd.tensorized_linear import TensorizedLinear
@@ -118,13 +118,18 @@ def train(net, loader, optimizer, criterion, lr_scheduler, epoch, writer, iterat
 
     prog_bar = tqdm(enumerate(loader), total=len(loader), desc=desc, leave=True)
     for batch_idx, (inputs, targets) in prog_bar:
+        # epoch wise decay
+        if isinstance(lr_scheduler, optim.lr_scheduler.ExponentialLR):
+            if hasattr(configs.scheduler, 'epoch_wise') and configs.scheduler.epoch_wise == True:
+                lr_scheduler.step()
+        
         inputs, targets = inputs.cuda(), targets.cuda()
         optimizer.zero_grad()
         # outputs = net(inputs)
         # loss = criterion(outputs, targets)
         # loss.backward()
 
-        if isinstance(optimizer, ZO_SCD_mask):
+        if isinstance(optimizer, (ZO_SCD_mask, ZO_SCD_esti, ZO_SCD_grad)):
             outputs, loss = optimizer.step(inputs, targets)
         elif isinstance(optimizer, ZO_SGD_mask):
             outputs, loss, grads_e = optimizer.step(inputs, targets)
@@ -315,7 +320,8 @@ def train_once(mb, net, named_masks, trainloader, testloader, writer, config, ck
                 'acc': test_acc,
                 'epoch': epoch,
                 'args': config.GraSP,
-                'mask': mb.masks,
+                'masks': mb.masks,
+                'named_masks': named_masks,
                 'ratio': mb.get_ratio_at_each_layer()
             }
             path = os.path.join(ckpt_path, 'finetune_%s_%s%s_r%s_it%d_best.pth.tar' % (config.GraSP.dataset,
@@ -352,22 +358,6 @@ def main():
     # load config *.yml file
     # recursive: also load default.yaml
     configs.load(args.config, recursive=False)  
-    
-    if configs.GraSP.network == 'fc':
-        model = MNIST_FC()
-    elif configs.GraSP.network == 'ttm':
-        model = MNIST_TTM(
-            tensor_type=configs.model.tensor_type,
-            max_rank = configs.model.max_rank
-        )
-    elif configs.GraSP.network == 'tt':
-        model = MNIST_TT(
-            tensor_type='tt',
-            rank=configs.model.rank,
-            dropouts=configs.model.dropouts
-        )
-    else:
-        raise ValueError(f"Wrong network_name {configs.GraSP.network}")
 
     # ================== Prepare logger ==========================
     paths = [configs.GraSP.dataset]
@@ -401,12 +391,6 @@ def main():
     # for name,parameters in model.named_parameters():
     #     print(name,':',parameters.size())
 
-    print(get_parameter_number(model))
-
-    # ====================================== build ModelBase ======================================
-    mb = ModelBase(configs.GraSP.network, configs.GraSP.depth, configs.GraSP.dataset, model)
-    mb.cuda()
-
     # preprocessing
     # ====================================== get dataloader ======================================
     trainloader, testloader = get_dataloader(configs.GraSP.dataset, configs.GraSP.batch_size, 256, 4)
@@ -416,13 +400,6 @@ def main():
     num_iterations = configs.GraSP.iterations
     target_ratio = configs.GraSP.target_ratio
     normalize = configs.GraSP.normalize
-
-    # ====================================== fetch exception ======================================
-    # exception = get_exception_layers(mb.model, str_to_list(configs.GraSP.exception, ',', int))
-    # logger.info('Exception: ')
-
-    # for idx, m in enumerate(exception):
-    #     logger.info('  (%d) %s' % (idx, m))
 
     # ====================================== fetch training schemes ======================================
     ratio = 1 - (1 - target_ratio) ** (1.0 / num_iterations)
@@ -435,51 +412,79 @@ def main():
     logger.info('Normalize: %s, Total iteration: %d, Target ratio: %.2f, Iter ratio %.4f.' %
                 (normalize, num_iterations, target_ratio, ratio))
 
-    # ====================================== start pruning ======================================
+    # ====================================== Prepare model ======================================
     iteration = 0
-    if configs.GraSP.pruner != False:
-        logger.info('** Target ratio: %.4f, iter ratio: %.4f, iteration: %d/%d.' % (target_ratio,
-                                                                                    ratio,
-                                                                                    1,
-                                                                                    num_iterations))
+    
+    if hasattr(configs, 'pretrained') and configs.pretrained.incre == True:
+        model_state = torch.load(configs.pretrained.load_model_path)
+        model = model_state['net']
+        logger.info('Pre-trained model accuracy: %.4f ' % model_state['acc'])
 
-        mb.model.apply(weights_init)
-        print("=> Applying weight initialization(%s)." % configs.GraSP.get('init_method', 'kaiming'))
-        print("Iteration of: %d/%d" % (iteration, num_iterations))
+        # ================== build ModelBase ==================
+        mb = ModelBase(configs.GraSP.network, configs.GraSP.depth, configs.GraSP.dataset, model)
+        mb.cuda()
 
-        masks, named_masks = GraSP_zo_mask(mb.model, ratio, trainloader, 'cuda',
-                      num_classes=configs.GraSP.num_classes,
-                      samples_per_class=configs.GraSP.samples_per_class,
-                      num_iters=configs.GraSP.num_iters)
-        iteration = 0
-        print('=> Using GraSP')
-        # ========== register mask ==================
-        mb.register_mask(masks)
-        # ========== save pruned network ============
-        logger.info('Saving..')
-        state = {
-            'net': mb.model,
-            'acc': -1,
-            'epoch': -1,
-            'args': configs.GraSP,
-            'mask': mb.masks,
-            'ratio': mb.get_ratio_at_each_layer()
-        }
-        path = os.path.join(ckpt_path, 'prune_%s_%s%s_r%s_it%d.pth.tar' % (configs.GraSP.dataset,
-                                                                            configs.GraSP.network,
-                                                                            configs.GraSP.depth,
-                                                                            configs.GraSP.target_ratio,
-                                                                            iteration))
-        torch.save(state, path)
+        if hasattr(configs.pretrained, 'pruned') and configs.pretrained.pruned == True:
+            masks = model_state['masks']
+            named_masks = model_state['named_masks']
+        else:
+            masks = None
+            named_masks = None
 
-        # ========== print pruning details ============
-        logger.info('**[%d] Mask and training setting: ' % iteration)
-        print_mask_information(mb, logger)
-        # logger.info('  LR: %.5f, WD: %.5f, Epochs: %d' %
-        #             (learning_rates[iteration], weight_decays[iteration], training_epochs[iteration]))
-    else:
-        named_masks = None
+    else:   # from scratch
+        # ================== Model ==================
+        model = build_model(configs)
+
+        # ================== build ModelBase ==================
+        mb = ModelBase(configs.GraSP.network, configs.GraSP.depth, configs.GraSP.dataset, model)
+        mb.cuda()
+        
+        # ================== start pruning ==================
+        if configs.GraSP.pruner != False:
+            logger.info('** Target ratio: %.4f, iter ratio: %.4f, iteration: %d/%d.' % (target_ratio,
+                                                                                        ratio,
+                                                                                        1,
+                                                                                        num_iterations))
+
+            mb.model.apply(weights_init)
+            print("=> Applying weight initialization(%s)." % configs.GraSP.get('init_method', 'kaiming'))
+            print("Iteration of: %d/%d" % (iteration, num_iterations))
+
+            masks, named_masks = GraSP_zo_mask(mb.model, ratio, trainloader, 'cuda',
+                          num_classes=configs.GraSP.num_classes,
+                          samples_per_class=configs.GraSP.samples_per_class,
+                          num_iters=configs.GraSP.num_iters)
+            iteration = 0
+            print('=> Using GraSP')
+            # ========== register mask ==================
+            mb.register_mask(masks)
+            # ========== save pruned network ============
+            logger.info('Saving..')
+            state = {
+                'net': mb.model,
+                'acc': -1,
+                'epoch': -1,
+                'args': configs.GraSP,
+                'mask': mb.masks,
+                'ratio': mb.get_ratio_at_each_layer()
+            }
+            path = os.path.join(ckpt_path, 'prune_%s_%s%s_r%s_it%d.pth.tar' % (configs.GraSP.dataset,
+                                                                                configs.GraSP.network,
+                                                                                configs.GraSP.depth,
+                                                                                configs.GraSP.target_ratio,
+                                                                                iteration))
+            torch.save(state, path)
+
+            # ========== print pruning details ============
+            logger.info('**[%d] Mask and training setting: ' % iteration)
+            print_mask_information(mb, logger)
+            # logger.info('  LR: %.5f, WD: %.5f, Epochs: %d' %
+            #             (learning_rates[iteration], weight_decays[iteration], training_epochs[iteration]))
+        else:
+            masks = None
+            named_masks = None
     # ======================= Training =======================
+    print(get_parameter_number(model))
     train_once( mb=mb,
                 net=mb.model,
                 named_masks = named_masks,

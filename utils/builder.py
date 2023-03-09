@@ -2,9 +2,30 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from optimizer import ZO_SCD_mask, ZO_SGD_mask
+from optimizer import ZO_SCD_mask, ZO_SGD_mask, ZO_SCD_esti, ZO_SCD_grad
 from utils.common_utils import PresetLRScheduler
+from models.tensor_models import MNIST_FC, MNIST_CNN, MNIST_TTM, MNIST_TT
 
+def build_model(config):
+    if config.GraSP.network == 'fc':
+        model = MNIST_FC()
+        return model
+    elif config.GraSP.network == 'ttm':
+        model = MNIST_TTM(
+            tensor_type=config.model.tensor_type,
+            max_rank = config.model.max_rank
+        )
+        return model
+    elif config.GraSP.network == 'tt':
+        model = MNIST_TT(
+            tensor_type='tt',
+            rank=config.model.rank,
+            dropouts=config.model.dropouts
+        )
+        return model
+    else:
+        raise ValueError(f"Wrong network_name {config.GraSP.network}")
+    
 def build_optimizer(config, net, criterion, named_masks, learning_rate, weight_decay):
     if config.optimizer.name == 'ZO_SCD_mask':
         net.requires_grad_(False)
@@ -14,7 +35,9 @@ def build_optimizer(config, net, criterion, named_masks, learning_rate, weight_d
             masks = named_masks,
             lr = learning_rate,
             grad_sparsity = config.optimizer.grad_sparsity,
-            tensorized = config.model.tensorized
+            tensorized = config.model.tensorized,
+            STP = config.optimizer.STP if hasattr(config.optimizer, 'STP') else False,
+            patience_table = config.optimizer.patience_table if hasattr(config.optimizer, 'patience_table') else False
         )
         return optimizer
     elif config.optimizer.name == 'ZO_SGD_mask':
@@ -31,6 +54,29 @@ def build_optimizer(config, net, criterion, named_masks, learning_rate, weight_d
             n_sample  = config.optimizer.n_sample,
             signSGD = config.optimizer.signSGD,
             layer_by_layer = config.optimizer.layer_by_layer,
+            tensorized = config.model.tensorized
+        )
+        return optimizer
+    elif config.optimizer.name == 'ZO_SCD_esti':
+        net.requires_grad_(False)
+        optimizer = ZO_SCD_esti(
+            model = net, 
+            criterion = criterion,
+            masks = named_masks,
+            lr = learning_rate,
+            grad_sparsity = config.optimizer.grad_sparsity,
+            tensorized = config.model.tensorized,
+            h_smooth = config.optimizer.h_smooth
+        )
+        return optimizer
+    elif config.optimizer.name == 'ZO_SCD_grad':
+        net.requires_grad_(False)
+        optimizer = ZO_SCD_grad(
+            model = net, 
+            criterion = criterion,
+            masks = named_masks,
+            lr = learning_rate,
+            grad_sparsity = config.optimizer.grad_sparsity,
             tensorized = config.model.tensorized
         )
         return optimizer

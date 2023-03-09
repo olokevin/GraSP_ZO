@@ -23,10 +23,10 @@ from torchonn.op.mzi_op import RealUnitaryDecomposerBatch, checkerboard_to_vecto
 from tensor_layers.layers import TensorizedLinear_linear, TensorizedLinear_module, TensorizedLinear_module_tonn
 from tensor_fwd_bwd.tensorized_linear import TensorizedLinear
 
-__all__ = ["ZO_SCD_mask"]
+__all__ = ["ZO_SCD_esti"]
 
 
-class ZO_SCD_mask(Optimizer):
+class ZO_SCD_esti(Optimizer):
     def __init__(
         self,
         model: nn.Module,
@@ -35,8 +35,7 @@ class ZO_SCD_mask(Optimizer):
         lr: float = 0.1,
         grad_sparsity: float = 0.1,
         tensorized: str = 'None',
-        STP: bool = False,
-        patience_table: bool = False
+        h_smooth = 0.001
     ):
         defaults = dict(lr=lr)
         super().__init__(model.parameters(), defaults)
@@ -47,9 +46,7 @@ class ZO_SCD_mask(Optimizer):
         self.masks = masks
         self.grad_sparsity = grad_sparsity
         self.tensorized = tensorized
-        self.STP = STP
-        self.patience_table = patience_table
-
+        self.h_smooth = h_smooth
         self.init_state()
 
     def init_state(self):
@@ -62,8 +59,8 @@ class ZO_SCD_mask(Optimizer):
         else:
             self.disable_mixedtraining()
         
-        if self.patience_table == True:
-            self.enable_patience_table()
+        # if self.patience_table == True:
+        #     self.enable_patience_table()
 
 
     def extract_modules(self, model):
@@ -164,20 +161,6 @@ class ZO_SCD_mask(Optimizer):
             }
             for layer_name, layer_params in self.trainable_params.items()
         }
-    
-    def enable_patience_table(self):
-        self.patience_table = {
-            layer_name: {
-                p_name: torch.zeros_like(self.mixedtrain_masks[layer_name][p_name]) for p_name, p in layer_params.items()
-            }
-            for layer_name, layer_params in self.trainable_params.items()
-        }
-    
-    def enable_STP(self):
-        self.STP = True
-    
-    def disable_stp(self):
-        self.STP = False
 
     def commit(self, layer_name: str, param_name: str, param: Tensor) -> None:
         '''
@@ -204,6 +187,13 @@ class ZO_SCD_mask(Optimizer):
             else:
                 raise ValueError(f"Wrong param_name {param_name}")
 
+    # ============ apply gradients all together ============
+    def _apply_gradients(self, params, grad, lr):
+        return {
+            layer_name: {p_name: p.sub_(grad[layer_name][p_name] * lr) for p_name, p in layer_params.items()}
+            for layer_name, layer_params in params.items()
+        }
+    
     def zo_coordinate_descent(self, obj_fn, params):
         """
         description: stochastic coordinate-wise descent.
@@ -213,11 +203,17 @@ class ZO_SCD_mask(Optimizer):
             y, old_loss = obj_fn()
             self.forward_counter += 1
         lr = get_learning_rate(self)
+        grads = dict()
 
         for layer_name, layer_params in params.items():
             layer_masks = self.mixedtrain_masks[layer_name]
+            layer_grads = dict()
+
             for p_name, p in layer_params.items():
                 selected_indices = layer_masks[p_name]
+                # param_grad: same size of p, masked remained 0
+                param_grad = torch.zeros_like(p)
+
                 for idx in selected_indices:
                     # ============ SparseTune in FLOPS+ [Gu+, DAC 2020] ============
                     cur_seed = get_random_state()
@@ -227,32 +223,27 @@ class ZO_SCD_mask(Optimizer):
                     if seed < self.grad_sparsity:
                         continue
                     old_value = p.data[idx]
-                    pos_perturbed_value = old_value + lr
-                    neg_perturbed_value = old_value - lr
+                    pos_perturbed_value = old_value + self.h_smooth
+                    neg_perturbed_value = old_value - self.h_smooth
 
-                    p.data[idx] = pos_perturbed_value
                     with torch.no_grad():  # training=True to enable profiling, but do not save graph
+                        p.data[idx] = pos_perturbed_value
                         self.commit(layer_name, p_name, p)
-                        y, new_loss = obj_fn()
+                        y, pos_loss = obj_fn()
                         self.forward_counter += 1
 
-                    if new_loss < old_loss:           # pos works
-                        old_loss = new_loss
-                    else:
                         p.data[idx] = neg_perturbed_value
-                        with torch.no_grad():
-                            self.commit(layer_name, p_name, p)
-                            y, new_loss = obj_fn()
-                            self.forward_counter += 1
-                        if self.STP == False:    # SZO-SCD
-                            old_loss = new_loss
-                        else:               # STP
-                            if new_loss < old_loss:   # neg works
-                                old_loss = new_loss 
-                            else:                     # remain
-                                p.data[idx] = old_value
-                                with torch.no_grad():
-                                    self.commit(layer_name, p_name, p)
+                        self.commit(layer_name, p_name, p)
+                        y, neg_loss = obj_fn()
+                        self.forward_counter += 1
+
+                        param_grad[idx] = (pos_loss-neg_loss)/2/self.h_smooth
+
+                layer_grads[p_name] = param_grad
+
+            grads[layer_name] = layer_grads
+
+        self._apply_gradients(params, grads, lr)
         return y, old_loss
 
     def build_obj_fn(self, data, target, model, criterion):

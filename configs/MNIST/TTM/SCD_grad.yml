@@ -1,10 +1,10 @@
 GraSP:
-  exp_name: "incre_lr0.001_ewise_grad0.8"
+  exp_name: "incre_two_lr0.001_grad0.8"
   network: ttm
   depth: 2
   dataset: mnist
   batch_size: 64
-  epoch: 10
+  epoch: 15
   learning_rate: 0.001
   weight_decay: 1e-4
   exception: -1
@@ -19,19 +19,18 @@ GraSP:
   num_iters: 1
 
 optimizer:
-  name: ZO_SCD_mask
+  name: ZO_SCD_grad
   grad_sparsity: 0.8
 
-# scheduler:
-#   name: 'PresetLRScheduler'
-#   lr_schedule: {0: 1,
-#                 5: 0.1,
-#                 10: 0.01}
-
 scheduler:
-  name: 'ExponentialLR'
-  gamma: 0.995
-  epoch_wise: True
+  name: 'PresetLRScheduler'
+  lr_schedule: {0: 1,
+                2: 0.1,
+                5: 0.01}
+
+# scheduler:
+#   name: 'ExponentialLR'
+#   gamma: 0.8
 
 run:
   runs: None

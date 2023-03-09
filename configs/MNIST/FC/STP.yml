@@ -1,11 +1,11 @@
 GraSP:
-  exp_name: "fc_95_FO_adam"
+  exp_name: "incre_fc_95_stp"
   network: fc
   depth: 2
   dataset: mnist
   batch_size: 128
-  epoch: 2
-  learning_rate: 0.01
+  epoch: 10
+  learning_rate: 0.001
   weight_decay: 1e-4
   exception: -1
   iterations: 1
@@ -19,14 +19,22 @@ GraSP:
   num_iters: 1
 
 optimizer:
-  name: ADAM
+  name: ZO_SCD_mask
+  grad_sparsity: 0
+  STP:  True
+  patience_table: False
 
 scheduler:
   name: 'PresetLRScheduler'
   gamma: 0.985
   lr_schedule: {0: 1,
-                10: 0.1,
-                20: 0.01}
+                2: 0.1,
+                5: 0.01}
+
+pretrained:
+  incre: True
+  load_model_path: './runs/pruning/mnist/fc/ADAM/fc_95_FO_adam/20230308-083304/run_None/finetune_mnist_fc2_r0.95_it0_best.pth.tar'
+  pruned: True
 
 run:
   runs: None
@@ -40,9 +48,11 @@ run:
 
 model:
   tensorized: 0
+  uncompressed: 0
+  precondition: 0
 
 checkpoint:
-  save_model: "model/MNIST_notensor_2layers_FP32"
+  save_model: "model/MNIST_notensor_SCD"
   save_mode: "best"
   proj_share_weight: 1
   label_smoothing: 1
