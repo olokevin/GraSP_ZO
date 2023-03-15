@@ -1,16 +1,16 @@
 GraSP:
-  exp_name: "tt_fo_adam"
+  exp_name: "scratch_lr0.01_lwise"
   network: tt
   depth: 2
   dataset: mnist
   batch_size: 128
-  epoch: 5
-  learning_rate: 0.005
+  epoch: 15
+  learning_rate: 0.01
   weight_decay: 1e-4
   exception: -1
   iterations: 1
   normalize: false
-  target_ratio: 0.95
+  target_ratio: 0.99
   pruner: False
   pruner_file: False
   num_classes: 10
@@ -19,19 +19,23 @@ GraSP:
   num_iters: 1
 
 optimizer:
-  name: ADAM
+  name: ZO_SGD_mask
+  sigma: 0.1
+  n_sample: 20
+  signSGD: True
+  layer_by_layer: False
+  debug: False
 
 scheduler:
   name: 'PresetLRScheduler'
-  gamma: 0.985
   lr_schedule: {0: 1,
                 5: 0.1,
-                20: 0.01}
+                10: 0.01}
 
-pretrained:
-  incre: False
-  load_model_path: './runs/pruning/mnist/ttm/ADAM/MNIST_ttm_FO_adam/20230308-062638/run_None/finetune_mnist_ttm2_r0.9_it0_best.pth.tar'
-  pruned: False
+# scheduler:
+#   name: 'ExponentialLR'
+#   gamma: 0.995
+#   epoch_wise: False
 
 run:
   runs: None
@@ -43,6 +47,11 @@ run:
   log_interval: 200
   train_noise: 0
 
+pretrained:
+  incre: False
+  load_model_path: 'runs/pruning/mnist/tt/ADAM/False/tt_fo_adam/20230315-001140/run_None/finetune_mnist_tt2_r0.95_it0_best.pth.tar'
+  pruned: False
+  
 model:
   tensorized: 'TensorizedLinear'
   rank: 0.1

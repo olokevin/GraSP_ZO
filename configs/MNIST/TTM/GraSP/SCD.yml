@@ -1,5 +1,5 @@
 GraSP:
-  exp_name: incre_lth0.8_grad0.8_lr0.001"
+  exp_name: "incre_lth0.8_grad0.8_lr0.001"
   network: ttm
   depth: 2
   dataset: mnist

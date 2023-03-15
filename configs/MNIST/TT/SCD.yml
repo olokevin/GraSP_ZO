@@ -1,11 +1,11 @@
 GraSP:
-  exp_name: "MNIST_tt_none_scd"
+  exp_name: "incre_scratch_tt_scd"
   network: tt
   depth: 2
   dataset: mnist
-  batch_size: 128
-  epoch: 30
-  learning_rate: 0.001
+  batch_size: 1024
+  epoch: 15
+  learning_rate: 0.0005
   weight_decay: 1e-4
   exception: -1
   iterations: 1
@@ -20,10 +20,18 @@ GraSP:
 
 optimizer:
   name: ZO_SCD_mask
-  grad_sparsity: 0.5
+  grad_sparsity: 0.8
+
+scheduler:
+  name: 'PresetLRScheduler'
   lr_schedule: {0: 1,
                 5: 0.1,
-                15: 0.01}
+                10: 0.01}
+
+# scheduler:
+#   name: 'ExponentialLR'
+#   gamma: 0.995
+#   epoch_wise: False
 
 run:
   runs: None
@@ -35,13 +43,12 @@ run:
   log_interval: 200
   train_noise: 0
 
+pretrained:
+  incre: True
+  load_model_path: 'runs/pruning/mnist/tt/ADAM/False/tt_fo_adam/20230315-001140/run_None/finetune_mnist_tt2_r0.95_it0_best.pth.tar'
+  pruned: False
+
 model:
   tensorized: 'TensorizedLinear'
   rank: 0.1
   dropouts: 0.1
-
-checkpoint:
-  save_model: "model/MNIST_notensor_SCD"
-  save_mode: "best"
-  proj_share_weight: 1
-  label_smoothing: 1

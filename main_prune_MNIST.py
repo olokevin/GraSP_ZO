@@ -72,10 +72,11 @@ def print_mask_information(mb, logger):
         if k == 'ratio':
             continue
         if isinstance(v, dict):
-            v_ratio = sum(v.values())
+            for idx, v_ratio in enumerate(v.values()):
+                logger.info('  (%d) tt-core %d: Remaining: %.2f%%' % (count, idx, v_ratio))
         else:
             v_ratio = v
-        logger.info('  (%d) %s: Remaining: %.2f%%' % (count, k, v_ratio))
+            logger.info('  (%d) %s: Remaining: %.2f%%' % (count, k, v_ratio))
         count += 1
 
 
@@ -290,8 +291,8 @@ def main():
 
     # ================== Prepare logger ==========================
     paths = [configs.GraSP.dataset]
-    summn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.pruner, configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
-    chekn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.pruner, configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
+    summn = [configs.GraSP.network, configs.optimizer.name, str(configs.GraSP.pruner), configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
+    chekn = [configs.GraSP.network, configs.optimizer.name, str(configs.GraSP.pruner), configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
     if configs.run.runs is not None:
         summn.append('run_%s/' % configs.run.runs)
         chekn.append('run_%s/' % configs.run.runs)
