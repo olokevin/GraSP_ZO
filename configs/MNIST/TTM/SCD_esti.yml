@@ -21,7 +21,7 @@ GraSP:
 optimizer:
   name: ZO_SCD_esti
   grad_sparsity: 0
-  h_smooth: 0.008
+  h_smooth: 0.0001
   opt_layers_strs: 'TensorizedLinear_module'
   debug: True
 

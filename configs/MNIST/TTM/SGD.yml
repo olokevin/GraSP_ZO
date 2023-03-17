@@ -21,7 +21,7 @@ GraSP:
 optimizer:
   name: ZO_SGD_mask
   sigma: 0.1
-  n_sample: 1000000
+  n_sample: 1000
   signSGD: False
   layer_by_layer: False
   opt_layers_strs: 'TensorizedLinear_module'
