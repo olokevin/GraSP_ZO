@@ -28,6 +28,7 @@ optimizer:
   switch_epoch: 10
   SCD_lr: 0.001
   grad_sparsity: 0.5
+  opt_layers_strs: 'TensorizedLinear_module'
   comment: 'signSGD + SCD'
 
 scheduler:

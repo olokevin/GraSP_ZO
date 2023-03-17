@@ -7,6 +7,7 @@ LastEditTime: 2021-10-24 16:27:47
 """
 from typing import Callable
 
+import copy
 import numpy as np
 import torch
 from pyutils.general import logger
@@ -22,9 +23,17 @@ from torch.optim import Optimizer
 from torchonn.op.mzi_op import RealUnitaryDecomposerBatch, checkerboard_to_vector, vector_to_checkerboard
 from tensor_layers.layers import TensorizedLinear_linear, TensorizedLinear_module, TensorizedLinear_module_tonn
 from tensor_fwd_bwd.tensorized_linear import TensorizedLinear
+# from tensorized_linear import TensorizedLinear
 
 __all__ = ["ZO_SCD_mask"]
 
+opt_able_layers_dict = {
+    'nn.Linear': nn.Linear,
+    'nn.Conv2d': nn.Conv2d,
+    'TensorizedLinear': TensorizedLinear,
+    'TensorizedLinear_module': TensorizedLinear_module,
+    'TensorizedLinear_module_tonn': TensorizedLinear_module_tonn
+}
 
 class ZO_SCD_mask(Optimizer):
     def __init__(
@@ -34,9 +43,9 @@ class ZO_SCD_mask(Optimizer):
         masks,
         lr: float = 0.1,
         grad_sparsity: float = 0.1,
-        tensorized: str = 'None',
-        STP: bool = False,
-        patience_table: bool = False
+        h_smooth: float = 0.001,
+        grad_estimator: str = 'sign',
+        opt_layers_strs: list = []
     ):
         defaults = dict(lr=lr)
         super().__init__(model.parameters(), defaults)
@@ -46,13 +55,14 @@ class ZO_SCD_mask(Optimizer):
         self.criterion = criterion
         self.masks = masks
         self.grad_sparsity = grad_sparsity
-        self.tensorized = tensorized
-        self.STP = STP
-        self.patience_table = patience_table
+        self.h_smooth = h_smooth
+        self.grad_estimator = grad_estimator
+        self.opt_layers_strs = opt_layers_strs
 
         self.init_state()
 
     def init_state(self):
+        self.opt_layers = self.create_opt_layers()
         self.modules = self.extract_modules(self.model)
         self.trainable_params = self.extract_trainable_parameters(self.model)
         # self.untrainable_params = self.extract_untrainable_parameters(self.model)
@@ -62,75 +72,53 @@ class ZO_SCD_mask(Optimizer):
         else:
             self.disable_mixedtraining()
         
-        if self.patience_table == True:
-            self.enable_patience_table()
+        # if self.patience_table == True:
+        #     self.enable_patience_table()
 
-
-    def extract_modules(self, model):
-        if self.tensorized == 'TensorizedLinear_module_tonn':
-            return {
-                layer_name: layer
-                for layer_name, layer in model.named_modules()
-                if isinstance(layer, (TensorizedLinear_module_tonn))
-            }
-        if self.tensorized == 'TensorizedLinear_module':
-            return {
-                layer_name: layer
-                for layer_name, layer in model.named_modules()
-                if isinstance(layer, (TensorizedLinear_module))
-            }
-        elif self.tensorized == 'TensorizedLinear':
-            return {
-                layer_name: layer
-                for layer_name, layer in model.named_modules()
-                if isinstance(layer, (TensorizedLinear))
-            }
+    def create_opt_layers(self):
+        if isinstance(self.opt_layers_strs, str):
+            return opt_able_layers_dict[self.opt_layers_strs]
+        elif isinstance(self.opt_layers_strs, list):
+            opt_layers = []
+            for layer_str in self.opt_layers_strs:
+                opt_layers.append(opt_able_layers_dict[layer_str])
+            return tuple(opt_layers)
         else:
-            return {
-                layer_name: layer
-                for layer_name, layer in model.named_modules()
-                if isinstance(layer, (nn.Linear, nn.Conv2d))
-            }
+            raise (ValueError("opt_layers_strs should either be a string of a list of strings"))
+        
+    def extract_modules(self, model):
+        return {
+            layer_name: layer
+            for layer_name, layer in model.named_modules()
+            if isinstance(layer, self.opt_layers)
+        }
 
     def extract_trainable_parameters(self, model):
-        # always flatten the parameters
-        if self.tensorized == 'TensorizedLinear_module_tonn':
-            return {
-                layer_name: {
-                    "tt_cores-"+str(i): getattr(layer,'tt_cores')[i].weight.view(-1)
+    # flatten the parameters
+        trainable_parameters = dict()
+        for layer_name, layer in self.modules.items():
+            if isinstance(layer, (TensorizedLinear_module_tonn)):
+                trainable_parameters[layer_name] = {
+                    "tt_cores-"+str(i): getattr(layer,'tt_cores')[i].weight.data.view(-1)
                     for i in range(getattr(layer, 'order'))
                 }
-                for layer_name, layer in model.named_modules()
-                if isinstance(layer, (TensorizedLinear_module_tonn))
-            }
-        elif self.tensorized == 'TensorizedLinear_module':
-            return {
-                layer_name: {
+            elif isinstance(layer, (TensorizedLinear_module)):
+                trainable_parameters[layer_name] = {
                     str(i): getattr(layer.tensor,'factors')[i].view(-1)
                     for i in range(getattr(layer.tensor, 'order'))
                 }
-                for layer_name, layer in model.named_modules()
-                if isinstance(layer, (TensorizedLinear_module))
-            }
-        elif self.tensorized == 'TensorizedLinear':
-            return {
-                layer_name: {
+            elif isinstance(layer, (TensorizedLinear)):
+                trainable_parameters[layer_name] = {
                     str(i): getattr(layer.weight.factors, 'factor_'+str(i)).view(-1)
                     for i in range(getattr(layer.weight, 'order'))
                 }
-                for layer_name, layer in model.named_modules()
-                if isinstance(layer, (TensorizedLinear))
-            }
-        else:
-            return {
-                layer_name: {  
+            elif isinstance(layer, (nn.Linear, nn.Conv2d)):
+                trainable_parameters[layer_name] = {  
                     param_name: getattr(layer, param_name).view(-1)
                     for param_name in ["weight"]
                 }
-                for layer_name, layer in model.named_modules()
-                if isinstance(layer, (nn.Linear, nn.Conv2d))
-            }
-
+        return trainable_parameters
+    
     # def extract_untrainable_parameters(self, model):
     #     return {
     #         layer_name: {
@@ -165,12 +153,48 @@ class ZO_SCD_mask(Optimizer):
             for layer_name, layer_params in self.trainable_params.items()
         }
     
-    def enable_patience_table(self):
-        self.patience_table = {
+    # def enable_patience_table(self):
+    #     self.patience_table = {
+    #         layer_name: {
+    #             p_name: torch.zeros_like(self.mixedtrain_masks[layer_name][p_name]) for p_name, p in layer_params.items()
+    #         }
+    #         for layer_name, layer_params in self.trainable_params.items()
+    #     }
+    
+    
+    def extract_grad_fo(self, model):
+    # flatten the parameters
+        grad_fo = dict()
+        for layer_name, layer in self.modules.items():
+            if isinstance(layer, (TensorizedLinear_module_tonn)):
+                grad_fo[layer_name] = {
+                    "tt_cores-"+str(i): getattr(layer,'tt_cores')[i].weight.grad.view(-1)
+                    for i in range(getattr(layer, 'order'))
+                }
+            elif isinstance(layer, (TensorizedLinear_module)):
+                grad_fo[layer_name] = {
+                    str(i): getattr(layer.tensor,'factors')[i].grad.view(-1)
+                    for i in range(getattr(layer.tensor, 'order'))
+                }
+            elif isinstance(layer, (TensorizedLinear)):
+                grad_fo[layer_name] = {
+                    str(i): getattr(layer.weight.factors, 'factor_'+str(i)).grad.view(-1)
+                    for i in range(getattr(layer.weight, 'order'))
+                }
+            elif isinstance(layer, (nn.Linear, nn.Conv2d)):
+                grad_fo[layer_name] = {  
+                    param_name: getattr(layer, param_name).grad.view(-1)
+                    for param_name in ["weight"]
+                }
+        return grad_fo
+
+    def cal_grad_err(self, params, grad_zo, grad_fo):
+        return {
             layer_name: {
-                p_name: torch.zeros_like(self.mixedtrain_masks[layer_name][p_name]) for p_name, p in layer_params.items()
+                p_name: grad_zo[layer_name][p_name] - grad_fo[layer_name][p_name]
+                for p_name, p in layer_params.items()
             }
-            for layer_name, layer_params in self.trainable_params.items()
+            for layer_name, layer_params in params.items()
         }
     
     def enable_STP(self):
@@ -184,13 +208,13 @@ class ZO_SCD_mask(Optimizer):
             layer_name:{param_name: p}
         '''
         layer = self.modules[layer_name]
-        if self.tensorized == 'TensorizedLinear_tonn':
+        if isinstance(layer, (TensorizedLinear_module_tonn)):
             raise NotImplementedError
-        if self.tensorized == 'TensorizedLinear_module':
+        elif isinstance(layer, (TensorizedLinear_module)):
             idx = int(param_name)
             ttm_shape = layer.tensor.factors[idx].shape
             layer.tensor.factors[idx].data = param.reshape(ttm_shape)
-        elif self.tensorized == 'TensorizedLinear':
+        elif isinstance(layer, (TensorizedLinear)):
             idx = int(param_name)
             tt_shape = (layer.weight.rank[idx],
                         layer.weight.shape[idx],
@@ -198,15 +222,18 @@ class ZO_SCD_mask(Optimizer):
             # t_param = torch.nn.parameter.Parameter(param.reshape(tt_shape), requires_grad=False)
             # setattr(layer.weight.factors, 'factor_'+param_name, t_param)
             setattr(getattr(layer.weight.factors, 'factor_'+param_name), 'data', param.reshape(tt_shape))
-        else:
+        elif isinstance(layer, (nn.Linear, nn.Conv2d)):
             if param_name == "weight":
                 layer.weight.data = param.reshape(layer.out_features, layer.in_features)
             else:
                 raise ValueError(f"Wrong param_name {param_name}")
 
-    def zo_coordinate_descent(self, obj_fn, params):
+    def zo_coordinate_descent_sign(self, obj_fn, params, STP=False):
         """
         description: stochastic coordinate-wise descent.
+        (2020 DAC) sparse fine-tuning
+        
+        A more efficient sign SGD
         """
         # evaluate objective on the current parameters
         with torch.no_grad():
@@ -226,35 +253,167 @@ class ZO_SCD_mask(Optimizer):
                     set_torch_deterministic(cur_seed)
                     if seed < self.grad_sparsity:
                         continue
-                    old_value = p.data[idx]
+                    old_value = copy.deepcopy(p.data[idx])
                     pos_perturbed_value = old_value + lr
                     neg_perturbed_value = old_value - lr
-
-                    p.data[idx] = pos_perturbed_value
+                    
                     with torch.no_grad():  # training=True to enable profiling, but do not save graph
-                        self.commit(layer_name, p_name, p)
+                        p.data[idx] = pos_perturbed_value
+                        # self.commit(layer_name, p_name, p)
                         y, new_loss = obj_fn()
                         self.forward_counter += 1
 
                     if new_loss < old_loss:           # pos works
                         old_loss = new_loss
                     else:
-                        p.data[idx] = neg_perturbed_value
                         with torch.no_grad():
-                            self.commit(layer_name, p_name, p)
+                            p.data[idx] = neg_perturbed_value
+                            # self.commit(layer_name, p_name, p)
                             y, new_loss = obj_fn()
                             self.forward_counter += 1
-                        if self.STP == False:    # SZO-SCD
+                        if STP == False:    # SZO-SCD
                             old_loss = new_loss
                         else:               # STP
                             if new_loss < old_loss:   # neg works
                                 old_loss = new_loss 
                             else:                     # remain
                                 p.data[idx] = old_value
-                                with torch.no_grad():
-                                    self.commit(layer_name, p_name, p)
+                                # with torch.no_grad():
+                                #     self.commit(layer_name, p_name, p)
         return y, old_loss
 
+    # ============ apply gradients all together ============
+    def _apply_gradients(self, params, grad, lr):
+        return {
+            layer_name: {p_name: p.sub_(grad[layer_name][p_name] * lr) for p_name, p in layer_params.items()}
+            for layer_name, layer_params in params.items()
+        }
+
+    def zo_coordinate_descent_batch(self, obj_fn, params):
+        """
+        description: stochastic coordinate-wise descent.
+        A variation of 2020 DAC fine-tuning
+
+        Update a batch of coordinates together 
+        (save coordinate-wise gradients)
+        """
+        # evaluate objective on the current parameters
+        with torch.no_grad():
+            y, old_loss = obj_fn()
+            self.forward_counter += 1
+        lr = get_learning_rate(self)
+        grads = dict()
+
+        for layer_name, layer_params in params.items():
+            layer_masks = self.mixedtrain_masks[layer_name]
+            layer_grads = dict()
+
+            for p_name, p in layer_params.items():
+                selected_indices = layer_masks[p_name]
+                # param_grad: same size of p, masked remained 0
+                param_grad = torch.zeros_like(p)
+
+                for idx in selected_indices:
+                    # ============ SparseTune in FLOPS+ [Gu+, DAC 2020] ============
+                    cur_seed = get_random_state()
+                    set_torch_stochastic()
+                    seed = np.random.rand()
+                    set_torch_deterministic(cur_seed)
+                    if seed < self.grad_sparsity:
+                        continue
+                    old_value = copy.deepcopy(p.data[idx])
+                    pos_perturbed_value = old_value + lr
+                    neg_perturbed_value = old_value - lr
+
+                    with torch.no_grad():  # training=True to enable profiling, but do not save graph
+                        p.data[idx] = pos_perturbed_value
+                        # self.commit(layer_name, p_name, p)
+                        y, pos_loss = obj_fn()
+                        self.forward_counter += 1
+
+                        p.data[idx] = neg_perturbed_value
+                        # self.commit(layer_name, p_name, p)
+                        y, neg_loss = obj_fn()
+                        self.forward_counter += 1
+
+                        # loss_list = [old_loss, pos_loss, neg_loss]
+                        # grad_list = [0, lr, -lr]
+
+                        loss_list = [old_loss, pos_loss]
+                        grad_list = [-lr, lr]
+
+                        param_grad[idx] = grad_list[loss_list.index(min(loss_list))]
+
+                        p.data[idx] = old_value
+                        # self.commit(layer_name, p_name, p)
+
+                layer_grads[p_name] = param_grad
+
+            grads[layer_name] = layer_grads
+
+        # different from others!
+        self._apply_gradients(params, grads, lr)
+        return y, old_loss, grads
+    
+    # ============ ZO-SCD-esti ============
+    def zo_coordinate_descent_esti(self, obj_fn, params):
+        """
+        description: stochastic coordinate-wise descent.
+            Coordinate Gradient Estimation
+            Update all coordinate gradient at the end
+
+        """
+        # evaluate objective on the current parameters
+        with torch.no_grad():
+            y, old_loss = obj_fn()
+            self.forward_counter += 1
+        lr = get_learning_rate(self)
+        grads = dict()
+
+        for layer_name, layer_params in params.items():
+            layer_masks = self.mixedtrain_masks[layer_name]
+            layer_grads = dict()
+
+            for p_name, p in layer_params.items():
+                selected_indices = layer_masks[p_name]
+                # param_grad: same size of p, masked remained 0
+                param_grad = torch.zeros_like(p)
+
+                for idx in selected_indices:
+                    # ============ SparseTune in FLOPS+ [Gu+, DAC 2020] ============
+                    cur_seed = get_random_state()
+                    set_torch_stochastic()
+                    seed = np.random.rand()
+                    set_torch_deterministic(cur_seed)
+                    if seed < self.grad_sparsity:
+                        continue
+                    old_value = copy.deepcopy(p.data[idx])
+                    pos_perturbed_value = old_value + self.h_smooth
+                    neg_perturbed_value = old_value - self.h_smooth
+
+                    with torch.no_grad():  # training=True to enable profiling, but do not save graph
+                        p.data[idx] = pos_perturbed_value
+                        # self.commit(layer_name, p_name, p)
+                        y, pos_loss = obj_fn()
+                        self.forward_counter += 1
+
+                        p.data[idx] = neg_perturbed_value
+                        # self.commit(layer_name, p_name, p)
+                        y, neg_loss = obj_fn()
+                        self.forward_counter += 1
+
+                        param_grad[idx] = (pos_loss-neg_loss)/2/self.h_smooth
+                        
+                        p.data[idx] = old_value
+                        # self.commit(layer_name, p_name, p)
+
+                layer_grads[p_name] = param_grad
+
+            grads[layer_name] = layer_grads
+
+        self._apply_gradients(params, grads, lr)
+        return y, old_loss, grads
+    
     def build_obj_fn(self, data, target, model, criterion):
         def _obj_fn():
             y = model(data)
@@ -283,13 +442,28 @@ class ZO_SCD_mask(Optimizer):
             return (pred, pred_slot), loss
         return _obj_fn
     
-    def step(self, data, target, ATIS=False):
+    def step(self, data, target, en_debug=False, ATIS=False):
         if ATIS == True:
             self.obj_fn = self.build_obj_fn_ATIS(data, target, self.model, self.criterion)
         else:
             self.obj_fn = self.build_obj_fn(data, target, self.model, self.criterion)
             
-        y, loss = self.zo_coordinate_descent(self.obj_fn, self.trainable_params)
+        if self.grad_estimator == 'sign':
+            y, loss = self.zo_coordinate_descent_sign(self.obj_fn, self.trainable_params, STP=False)
+            grads_zo = None
+        elif self.grad_estimator == 'STP':
+            y, loss = self.zo_coordinate_descent_sign(self.obj_fn, self.trainable_params, STP=True)
+            grads_zo = None
+        elif self.grad_estimator == 'batch':
+            y, loss, grads_zo = self.zo_coordinate_descent_batch(self.obj_fn, self.trainable_params)
+        elif self.grad_estimator == 'esti':
+            y, loss, grads_zo = self.zo_coordinate_descent_esti(self.obj_fn, self.trainable_params)
         # update internal parameters
         self.global_step += 1
-        return y, loss
+        # output gradients
+        if en_debug == True:
+            grads_fo = self.extract_grad_fo(self.model)
+            grads_err = self.cal_grad_err(self.trainable_params, grads_zo, grads_fo)
+            return y, loss, (grads_zo, grads_fo, grads_err)
+        else:
+            return y, loss, grads_zo

@@ -24,6 +24,7 @@ optimizer:
   n_sample: 20
   signSGD: True
   layer_by_layer: False
+  opt_layers_strs: 'TensorizedLinear'
   debug: False
 
 scheduler:

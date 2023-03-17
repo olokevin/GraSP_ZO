@@ -1,11 +1,11 @@
 GraSP:
-  exp_name: "lr0-01_exp08_e15"
+  exp_name: "incre_bz1024_lr0.0001_K10000_exp85"
   network: ttm
   depth: 2
   dataset: mnist
-  batch_size: 64
-  epoch: 15
-  learning_rate: 0.01
+  batch_size: 1024
+  epoch: 30
+  learning_rate: 0.0001
   weight_decay: 1e-4
   exception: -1
   iterations: 1
@@ -24,15 +24,18 @@ optimizer:
   n_sample: 10
   signSGD: False
   layer_by_layer: False
-  debug: False
-  comment: 'use pos and neg, extract only data'
+  opt_layers_strs: 'TensorizedLinear_module'
+  debug: True
+
+scheduler:
+  name: 'PresetLRScheduler'
+  lr_schedule: {0: 1,
+                5: 0.1,
+                10: 0.01}
 
 scheduler:
   name: 'ExponentialLR'
-  gamma: 0.8
-  lr_schedule: {0: 1,
-                10: 0.1,
-                20: 0.01}
+  gamma: 0.85
 
 run:
   runs: None
@@ -43,6 +46,11 @@ run:
   deterministic: 1
   log_interval: 200
   train_noise: 0
+
+pretrained:
+  incre: True
+  load_model_path: './runs/pruning/mnist/ttm/ZO_SGD_mask/MNIST_ttm_sgd_exp085_e15/20230307-075309/run_None/finetune_mnist_ttm2_r0.99_it0_best.pth.tar'
+  pruned: False
 
 model:
   tensor_type: 'TensorTrainMatrix'

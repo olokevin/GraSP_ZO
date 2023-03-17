@@ -23,6 +23,7 @@ optimizer:
   grad_sparsity: 0.8
   STP:  True
   patience_table: False
+  opt_layers_strs: 'TensorizedLinear_module'
 
 scheduler:
   name: 'PresetLRScheduler'

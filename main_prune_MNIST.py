@@ -4,6 +4,7 @@ import math
 import os
 import sys
 import time
+import shutil
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -19,6 +20,12 @@ from models.model_base import ModelBase
 from pruner.GraSP_zo_mask import GraSP_zo_mask
 
 from pyutils.config import configs
+from pyutils.torch_train import (
+    get_learning_rate,
+    get_random_state,
+    set_torch_deterministic,
+    set_torch_stochastic,
+)
 from optimizer import ZO_SCD_mask, ZO_SGD_mask, ZO_SCD_esti, ZO_SCD_grad
 
 # from tensor_layers.layers import TensorizedLinear_module
@@ -41,8 +48,8 @@ def init_config():
 
 
 def init_logger(config):
-    makedirs(config.summary_dir)
-    makedirs(config.checkpoint_dir)
+    # makedirs(config.summary_dir)
+    # makedirs(config.checkpoint_dir)
 
     # set logger
     path = os.path.dirname(os.path.abspath(__file__))
@@ -134,22 +141,33 @@ def train(net, loader, optimizer, criterion, lr_scheduler, epoch, writer, iterat
         # loss = criterion(outputs, targets)
         # loss.backward()
 
+        # test, check real grads
+        en_debug = configs.optimizer.debug
+        if en_debug == True:
+            # test_optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+            outputs = net(inputs)
+            loss = criterion(outputs, targets)
+            loss.backward()
+            # test_optimizer.step()
+
         if isinstance(optimizer, (ZO_SCD_mask, ZO_SCD_esti, ZO_SCD_grad)):
-            outputs, loss = optimizer.step(inputs, targets)
+            with torch.no_grad():
+                outputs, loss, grads = optimizer.step(inputs, targets, en_debug=en_debug)
         elif isinstance(optimizer, ZO_SGD_mask):
-            outputs, loss, grads_e = optimizer.step(inputs, targets)
-            # test, check real grads
-            if configs.optimizer.debug == True:
-                test_optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
-                outputs = net(inputs)
-                loss = criterion(outputs, targets)
-                loss.backward()
-                test_optimizer.step()
+            with torch.no_grad():
+                outputs, loss, grads = optimizer.step(inputs, targets, en_debug=en_debug)
         else:
             outputs = net(inputs)
             loss = criterion(outputs, targets)
             loss.backward()
             optimizer.step()
+        
+        if en_debug == True:
+            if isinstance(optimizer, ZO_SCD_mask):
+                grads_path = os.path.join('./figs/' + configs.optimizer.name + '/h_'+str(configs.optimizer.h_smooth)+'.pth')
+            elif isinstance(optimizer, ZO_SGD_mask):
+                grads_path = os.path.join('./figs/' + configs.optimizer.name + '/N_'+str(configs.optimizer.n_sample)+'.pth')
+            torch.save(grads, grads_path)
 
         train_loss += loss.item()
         _, predicted = outputs.max(1)
@@ -289,6 +307,8 @@ def main():
     # recursive: also load default.yaml
     configs.load(args.config, recursive=False)  
 
+    set_torch_deterministic(42)
+
     # ================== Prepare logger ==========================
     paths = [configs.GraSP.dataset]
     summn = [configs.GraSP.network, configs.optimizer.name, str(configs.GraSP.pruner), configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
@@ -306,6 +326,11 @@ def main():
     print("=> config.summary_dir:    %s" % configs.GraSP.summary_dir)
     print("=> config.checkpoint_dir: %s" % configs.GraSP.checkpoint_dir)
 
+    # save .yml to directory
+    makedirs(configs.GraSP.summary_dir)
+    makedirs(configs.GraSP.checkpoint_dir)
+    shutil.copy(args.config, configs.GraSP.summary_dir)
+    
     logger, writer = init_logger(configs.GraSP)
     # logger.info(dict(configs))
     logger.info(dict(configs.GraSP))

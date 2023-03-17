@@ -27,7 +27,19 @@
       "env": {
         "CUDA_VISIBLE_DEVICES": "2"
       },
-      "args": ["-config", "configs/MNIST/TTM/GraSP/FO.yml"],
+      "args": ["-config", "configs/MNIST/TTM/SCD_esti.yml"],
+      "justMyCode": true
+    },
+    {
+      "name": "MNIST_ZO-SGD",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "env": {
+        "CUDA_VISIBLE_DEVICES": "2"
+      },
+      "args": ["-config", "configs/MNIST/TTM/SGD.yml"],
       "justMyCode": true
     }
   ]

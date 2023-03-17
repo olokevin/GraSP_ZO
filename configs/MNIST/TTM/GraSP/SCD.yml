@@ -22,6 +22,7 @@ optimizer:
   name: ZO_SCD_mask
   grad_sparsity: 0.8
   STP: False
+  opt_layers_strs: 'TensorizedLinear_module'
 
 scheduler:
   name: 'PresetLRScheduler'

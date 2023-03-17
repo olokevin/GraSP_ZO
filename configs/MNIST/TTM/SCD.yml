@@ -1,5 +1,5 @@
 GraSP:
-  exp_name: "incre_bz4096_lr0.0005_grad0"
+  exp_name: "incre_bz4096_lr0.0005_grad0.8"
   network: ttm
   depth: 2
   dataset: mnist
@@ -20,7 +20,8 @@ GraSP:
 
 optimizer:
   name: ZO_SCD_mask
-  grad_sparsity: 0
+  grad_sparsity: 0.8
+  opt_layers_strs: 'TensorizedLinear_module'
 
 scheduler:
   name: 'PresetLRScheduler'
