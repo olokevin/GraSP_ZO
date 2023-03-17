@@ -21,7 +21,7 @@ GraSP:
 optimizer:
   name: ZO_SGD_mask
   sigma: 0.1
-  n_sample: 10
+  n_sample: 1000000
   signSGD: False
   layer_by_layer: False
   opt_layers_strs: 'TensorizedLinear_module'
@@ -49,7 +49,8 @@ run:
 
 pretrained:
   incre: True
-  load_model_path: './runs/pruning/mnist/ttm/ZO_SGD_mask/MNIST_ttm_sgd_exp085_e15/20230307-075309/run_None/finetune_mnist_ttm2_r0.99_it0_best.pth.tar'
+  load_model_path: './runs/pruning/mnist/ttm/ADAM/MNIST_ttm_FO_adam/20230308-062638/run_None/finetune_mnist_ttm2_r0.9_it0_best.pth.tar'
+  # load_model_path: './runs/pruning/mnist/ttm/ZO_SGD_mask/MNIST_ttm_sgd_exp085_e15/20230307-075309/run_None/finetune_mnist_ttm2_r0.99_it0_best.pth.tar'
   pruned: False
 
 model:

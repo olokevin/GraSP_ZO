@@ -19,7 +19,7 @@
       "justMyCode": true
     },
     {
-      "name": "${workspace}/main_prune_MNIST.py",
+      "name": "MNIST_ZO_SCD_esti",
       "type": "python",
       "request": "launch",
       "program": "${file}",
@@ -31,7 +31,7 @@
       "justMyCode": true
     },
     {
-      "name": "MNIST_ZO-SGD",
+      "name": "MNIST_ZO_SGD",
       "type": "python",
       "request": "launch",
       "program": "${file}",

@@ -95,17 +95,17 @@ class ZO_SGD_mask(Optimizer):
                 }
             elif isinstance(layer, (TensorizedLinear_module)):
                 trainable_parameters[layer_name] = {
-                    str(i): getattr(layer.tensor,'factors')[i].view(-1)
+                    str(i): getattr(layer.tensor,'factors')[i].data.view(-1)
                     for i in range(getattr(layer.tensor, 'order'))
                 }
             elif isinstance(layer, (TensorizedLinear)):
                 trainable_parameters[layer_name] = {
-                    str(i): getattr(layer.weight.factors, 'factor_'+str(i)).view(-1)
+                    str(i): getattr(layer.weight.factors, 'factor_'+str(i)).data.view(-1)
                     for i in range(getattr(layer.weight, 'order'))
                 }
             elif isinstance(layer, (nn.Linear, nn.Conv2d)):
                 trainable_parameters[layer_name] = {  
-                    param_name: getattr(layer, param_name).view(-1)
+                    param_name: getattr(layer, param_name).data.view(-1)
                     for param_name in ["weight"]
                 }
         return trainable_parameters
