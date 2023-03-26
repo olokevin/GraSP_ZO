@@ -20,6 +20,7 @@ GraSP:
 
 optimizer:
   name: ZO_SCD_mask
+  grad_estimator: STP
   grad_sparsity: 0
   STP:  True
   patience_table: False

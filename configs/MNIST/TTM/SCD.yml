@@ -20,8 +20,11 @@ GraSP:
 
 optimizer:
   name: ZO_SCD_mask
+  grad_estimator: sign
   grad_sparsity: 0.8
   opt_layers_strs: 'TensorizedLinear_module'
+  STP: False
+  debug: False
 
 scheduler:
   name: 'PresetLRScheduler'

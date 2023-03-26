@@ -163,11 +163,19 @@ def train(net, loader, optimizer, criterion, lr_scheduler, epoch, writer, iterat
             optimizer.step()
         
         if en_debug == True:
-            if isinstance(optimizer, ZO_SCD_mask):
-                grads_path = os.path.join('./figs/' + configs.optimizer.name + '/h_'+str(configs.optimizer.h_smooth)+'.pth')
-            elif isinstance(optimizer, ZO_SGD_mask):
-                grads_path = os.path.join('./figs/' + configs.optimizer.name + '/N_'+str(configs.optimizer.n_sample)+'.pth')
-            torch.save(grads, grads_path)
+            grads_err = grads[2]
+            grads_err_norm = dict()
+            for layer_name, layer_params in grads_err.items():
+                grads_err_norm[layer_name] = dict()
+                for p_name, p in layer_params.items():
+                    p_norm = torch.linalg.norm(p)
+                    grads_err_norm[layer_name][p_name] = p_norm
+                    logger.info('epoch[%d], layer: %s, param: %s, grads_err_norm: %.4f' % (epoch, layer_name, p_name, p_norm))
+            # if isinstance(optimizer, ZO_SCD_mask):
+            #     grads_path = os.path.join('./figs/' + configs.optimizer.name + '/h_'+str(configs.optimizer.h_smooth)+'.pth')
+            # elif isinstance(optimizer, ZO_SGD_mask):
+            #     grads_path = os.path.join('./figs/' + configs.optimizer.name + '/N_'+str(configs.optimizer.n_sample)+'.pth')
+            # torch.save(grads, grads_path)
 
         train_loss += loss.item()
         _, predicted = outputs.max(1)

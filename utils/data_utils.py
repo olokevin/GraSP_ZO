@@ -78,6 +78,8 @@ def get_dataloader(dataset, train_batch_size, test_batch_size, num_workers=2, ro
     if dataset == 'mnist':
         trainset = torchvision.datasets.MNIST(root=root, train=True, download=True, transform=transform_train)
         testset = torchvision.datasets.MNIST(root=root, train=False, download=True, transform=transform_test)
+        print(len(trainset))
+        print(len(testset))
 
     if dataset == 'cifar10':
         trainset = torchvision.datasets.CIFAR10(root=root, train=True, download=True, transform=transform_train)

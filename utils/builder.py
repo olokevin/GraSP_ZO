@@ -33,16 +33,18 @@ def build_optimizer(config, net, criterion, named_masks, learning_rate, weight_d
         else:
             net.requires_grad_(False)
 
-        if config.optimizer.name == 'ZO_SCD_mask':
-            grad_estimator = 'sign'
-        elif config.optimizer.name == 'ZO_SCD_grad':
-            grad_estimator = 'batch'
-        elif config.optimizer.name == 'ZO_SCD_esti':
-            grad_estimator = 'esti'
-        elif config.optimizer.name == 'ZO_SCD_STP':
-            grad_estimator = 'STP'
-        else:
-            raise ValueError(f"Wrong ZO_SCD optimizer name {config.optimizer.name}")
+        # if config.optimizer.name == 'ZO_SCD_mask':
+        #     grad_estimator = 'sign'
+        # elif config.optimizer.name == 'ZO_SCD_grad':
+        #     grad_estimator = 'batch'
+        # elif config.optimizer.name == 'ZO_SCD_esti':
+        #     grad_estimator = 'esti'
+        # elif config.optimizer.name == 'ZO_SCD_STP':
+        #     grad_estimator = 'STP'
+        # else:
+        #     raise ValueError(f"Wrong ZO_SCD optimizer name {config.optimizer.name}")
+
+        grad_estimator = config.optimizer.grad_estimator
         
         optimizer = ZO_SCD_mask(
             model = net, 
@@ -52,7 +54,8 @@ def build_optimizer(config, net, criterion, named_masks, learning_rate, weight_d
             grad_sparsity = config.optimizer.grad_sparsity,
             h_smooth = config.optimizer.h_smooth if hasattr(config.optimizer, 'h_smooth') else 0.1,
             grad_estimator = grad_estimator,
-            opt_layers_strs = config.optimizer.opt_layers_strs
+            opt_layers_strs = config.optimizer.opt_layers_strs,
+            STP = config.optimizer.STP if hasattr(config.optimizer, 'STP') else False
         )
         return optimizer
     elif config.optimizer.name == 'ZO_SGD_mask':

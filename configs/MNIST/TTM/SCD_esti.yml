@@ -1,5 +1,5 @@
 GraSP:
-  exp_name: "scratch_bz128_lr0.01_h0.008_grad0.5"
+  exp_name: "incre_bz60000_lr0.001_h0.1_grad0.8"
   network: ttm
   depth: 2
   dataset: mnist
@@ -20,16 +20,18 @@ GraSP:
 
 optimizer:
   name: ZO_SCD_esti
-  grad_sparsity: 0
-  h_smooth: 0.0001
+  grad_estimator: esti
+  grad_sparsity: 0.8
+  h_smooth: 0.1
   opt_layers_strs: 'TensorizedLinear_module'
-  debug: True
+  STP: True
+  debug: False
 
 scheduler:
   name: 'PresetLRScheduler'
   lr_schedule: {0: 1,
-                5: 0.1,
-                10: 0.01}
+                10: 0.1,
+                20: 0.1}
 
 # scheduler:
 #   name: 'ExponentialLR'

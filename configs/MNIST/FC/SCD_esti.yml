@@ -1,11 +1,11 @@
 GraSP:
-  exp_name: "incre_95_grad0.5_lr0.01"
+  exp_name: "incre_95_h0.1_grad0.5_lr0.0001"
   network: fc
   depth: 2
   dataset: mnist
   batch_size: 128
   epoch: 25
-  learning_rate: 0.001
+  learning_rate: 0.0001
   weight_decay: 1e-4
   exception: -1
   iterations: 1
@@ -19,26 +19,23 @@ GraSP:
   num_iters: 1
 
 optimizer:
-  name: ZO_SCD_sign
-  grad_estimator: sign
-  grad_sparsity: 0.5
+  name: ZO_SCD_esti_two
+  grad_estimator: esti
+  grad_sparsity: 0
+  h_smooth: 0.1s
   opt_layers_strs: 'nn.Linear'
   STP: False
   debug: False
 
 scheduler:
   name: 'PresetLRScheduler'
-  gamma: 0.985
   lr_schedule: {0: 1,
-                2: 0.1,
-                15: 0.01}
+                15: 0.1}
 
 pretrained:
   incre: True
   load_model_path: './runs/pruning/mnist/fc/ZO_SCD_mask/GraSP/scratch_95_grad0.5_lr0.01/20230324-220530/run_None/finetune_mnist_fc2_r0.95_it0_best.pth.tar'
   pruned: True
-
-
 
 run:
   runs: None

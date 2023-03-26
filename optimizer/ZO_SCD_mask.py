@@ -45,7 +45,8 @@ class ZO_SCD_mask(Optimizer):
         grad_sparsity: float = 0.1,
         h_smooth: float = 0.001,
         grad_estimator: str = 'sign',
-        opt_layers_strs: list = []
+        opt_layers_strs: list = [],
+        STP: bool = True
     ):
         defaults = dict(lr=lr)
         super().__init__(model.parameters(), defaults)
@@ -58,6 +59,7 @@ class ZO_SCD_mask(Optimizer):
         self.h_smooth = h_smooth
         self.grad_estimator = grad_estimator
         self.opt_layers_strs = opt_layers_strs
+        self.STP = STP
 
         self.init_state()
 
@@ -228,7 +230,7 @@ class ZO_SCD_mask(Optimizer):
             else:
                 raise ValueError(f"Wrong param_name {param_name}")
 
-    def zo_coordinate_descent_sign(self, obj_fn, params, STP=False):
+    def zo_coordinate_descent_sign(self, obj_fn, params):
         """
         description: stochastic coordinate-wise descent.
         (2020 DAC) sparse fine-tuning
@@ -271,7 +273,7 @@ class ZO_SCD_mask(Optimizer):
                             # self.commit(layer_name, p_name, p)
                             y, new_loss = obj_fn()
                             self.forward_counter += 1
-                        if STP == False:    # SZO-SCD
+                        if self.STP == False:    # SZO-SCD
                             old_loss = new_loss
                         else:               # STP
                             if new_loss < old_loss:   # neg works
@@ -336,11 +338,12 @@ class ZO_SCD_mask(Optimizer):
                         y, neg_loss = obj_fn()
                         self.forward_counter += 1
 
-                        # loss_list = [old_loss, pos_loss, neg_loss]
-                        # grad_list = [0, lr, -lr]
-
-                        loss_list = [old_loss, pos_loss]
-                        grad_list = [-lr, lr]
+                        if self.STP == True:
+                            loss_list = [old_loss, pos_loss, neg_loss]
+                            grad_list = [0, -1, 1]
+                        else:
+                            loss_list = [old_loss, pos_loss]
+                            grad_list = [1, -1]
 
                         param_grad[idx] = grad_list[loss_list.index(min(loss_list))]
 
@@ -397,12 +400,15 @@ class ZO_SCD_mask(Optimizer):
                         y, pos_loss = obj_fn()
                         self.forward_counter += 1
 
-                        p.data[idx] = neg_perturbed_value
-                        # self.commit(layer_name, p_name, p)
-                        y, neg_loss = obj_fn()
-                        self.forward_counter += 1
+                        if self.STP == True:
+                            p.data[idx] = neg_perturbed_value
+                            # self.commit(layer_name, p_name, p)
+                            y, neg_loss = obj_fn()
+                            self.forward_counter += 1
 
-                        param_grad[idx] = (pos_loss-neg_loss)/2/self.h_smooth
+                            param_grad[idx] = (pos_loss-neg_loss)/2/self.h_smooth
+                        else:
+                            param_grad[idx] = (pos_loss-old_loss)/2/self.h_smooth
                         
                         p.data[idx] = old_value
                         # self.commit(layer_name, p_name, p)
@@ -449,10 +455,7 @@ class ZO_SCD_mask(Optimizer):
             self.obj_fn = self.build_obj_fn(data, target, self.model, self.criterion)
             
         if self.grad_estimator == 'sign':
-            y, loss = self.zo_coordinate_descent_sign(self.obj_fn, self.trainable_params, STP=False)
-            grads_zo = None
-        elif self.grad_estimator == 'STP':
-            y, loss = self.zo_coordinate_descent_sign(self.obj_fn, self.trainable_params, STP=True)
+            y, loss = self.zo_coordinate_descent_sign(self.obj_fn, self.trainable_params)
             grads_zo = None
         elif self.grad_estimator == 'batch':
             y, loss, grads_zo = self.zo_coordinate_descent_batch(self.obj_fn, self.trainable_params)

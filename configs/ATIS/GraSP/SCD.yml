@@ -4,35 +4,38 @@ GraSP:
   depth: 2
   dataset: ATIS
   batch_size: 64
-  epoch: 30
+  epoch: 50
   learning_rate: 0.001
   weight_decay: 1e-4
   exception: -1
   iterations: 1
   normalize: false
   target_ratio: 0.95
-  pruner: False
-  pruner_file: False
+  pruner: GraSP_attn
+  pruner_file: GraSP_attn
   num_classes: 21
   samples_per_class: 10
   samples_batches: 5
   num_iters: 1
 
 optimizer:
-  name: ZO_SCD_mask
-  grad_sparsity: 0.9
+  name: ZO_SCD_sign
+  grad_estimator: sign
+  grad_sparsity: 0.5
+  opt_layers_strs: 'nn.Linear, TensorizedLinear_module'
+  STP: False
+  debug: False
 
 scheduler:
   name: 'PresetLRScheduler'
-  gamma: 0.985
   lr_schedule: {0: 1,
-                5: 0.1,
-                10: 0.01}
+                10: 0.1,
+                20: 0.01}
 
 pretrained:
-  incre: True
+  incre: False
   load_model_path: 'model/ATIS_GraSP_FO_95_best.chkpt'
-  pruner: GraSP_attn
+  pruned: False
 
 run:
   runs: None

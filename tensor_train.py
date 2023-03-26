@@ -12,6 +12,7 @@ import argparse
 import math
 import time
 import os
+import shutil
 
 from tqdm import tqdm
 import torch
@@ -421,26 +422,32 @@ def main():
     
     # ================== Prepare logger ==========================
     paths = [configs.GraSP.dataset]
-    summn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.exp_name]
-    chekn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.exp_name]
+    summn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
+    chekn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
     if configs.run.runs is not None:
         summn.append('run_%s' % configs.run.runs)
         chekn.append('run_%s' % configs.run.runs)
-    summn.append("summary/")
-    chekn.append("checkpoint/")
+    # summn.append("summary/")
+    # chekn.append("checkpoint/")
     summary_dir = ["./runs/pruning"] + paths + summn
     ckpt_dir = ["./runs/pruning"] + paths + chekn
+    # summary_dir, ckpt_dir is path (with / in the end)
     configs.GraSP.summary_dir = os.path.join(*summary_dir)
     configs.GraSP.checkpoint_dir = os.path.join(*ckpt_dir)
     print("=> config.summary_dir:    %s" % configs.GraSP.summary_dir)
     print("=> config.checkpoint_dir: %s" % configs.GraSP.checkpoint_dir)
 
+    # save .yml to directory
+    makedirs(configs.GraSP.summary_dir)
+    makedirs(configs.GraSP.checkpoint_dir)
+    shutil.copy(opt.config, configs.GraSP.summary_dir)
+
     logger, writer = init_logger(configs.GraSP)
     logger.info(dict(configs))
 
     # ====================================== graph and stat ======================================
-    t_batch = next(iter(training_data))
-    targets, inputs, slot_label,attn,seg = map(lambda x: x.to(device), t_batch)
+    # t_batch = next(iter(training_data))
+    # targets, inputs, slot_label,attn,seg = map(lambda x: x.to(device), t_batch)
     
     # writer.add_graph(model, (inputs,attn,seg))
     # writer.close()
@@ -472,8 +479,30 @@ def main():
     # ====================================== start pruning ======================================
     # we need: model, mb, masks, named_masks
     iteration = 0
+
+    # has pretrained model
+    if hasattr(configs, 'pretrained') and configs.pretrained.incre == True:
+        model_state = torch.load(configs.pretrained.load_model_path)
+        model = model_state['net']
+        logger.info('Pre-trained model accuracy: %.4f ' % model_state['acc'])
+    # from scratch
+    else: 
+        model = transformer
+    
+    # build ModelBase 
+    mb = ModelBase(configs.GraSP.network, configs.GraSP.depth, configs.GraSP.dataset, model)
+    mb.cuda()
+
+    # ====================================== Pruning Masks ======================================
+    # @ToDo: check whether this attribute exists
+    # if hasattr(configs, 'pretrained') and hasattr(configs.pretrained, 'pretrained'):
+    
+    # has pretrained pruned masks:
+    if hasattr(configs, 'pretrained') and configs.pretrained.incre == True and configs.pretrained.pruned == True:
+        masks = model_state['masks']
+        named_masks = model_state['named_masks']
     # Need pruning
-    if configs.GraSP.pruner != False:
+    elif configs.GraSP.pruner != False:
         logger.info('** Target ratio: %.4f, iter ratio: %.4f, iteration: %d/%d.' % (target_ratio,
                                                                                     ratio,
                                                                                     1,
@@ -520,27 +549,9 @@ def main():
         print_mask_information(mb, logger)
         # logger.info('  LR: %.5f, WD: %.5f, Epochs: %d' %
         #             (learning_rates[iteration], weight_decays[iteration], training_epochs[iteration]))
-    # no need to prune this time, check whether incre
     else:
-        # ================== Pre-trained model ==========================
-        if configs.pretrained.incre == True:
-            if configs.pretrained.pruner != False:
-                model_state = torch.load(configs.pretrained.load_model_path)
-                model = model_state['model']
-                masks = model_state['masks']
-                named_masks = model_state['named_masks']
-            else:
-                model = torch.load(configs.pretrained.load_model_path)
-                masks = None
-                named_masks = None
-        # ================== No Pre-trained model ==========================
-        else:
-            model = transformer
-            masks = None
-            named_masks = None
-        
-        mb = ModelBase(configs.GraSP.network, configs.GraSP.depth, configs.GraSP.dataset, model)
-        mb.cuda()
+        masks = None
+        named_masks = None
     
     print(get_parameter_number(model))
         
