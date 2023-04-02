@@ -1,5 +1,5 @@
 GraSP:
-  exp_name: "MNIST_ttm_FO_adam"
+  exp_name: "with momentum"
   network: ttm
   depth: 2
   dataset: mnist
@@ -20,17 +20,17 @@ GraSP:
 
 optimizer:
   name: ADAM
+  grad_sparsity: 0
 
 scheduler:
   name: 'PresetLRScheduler'
   gamma: 0.985
   lr_schedule: {0: 1,
-                5: 0.1,
-                20: 0.01}
+                10: 0.1}
 
 pretrained:
-  incre: False
-  load_model_path: './runs/pruning/mnist/ttm/ADAM/MNIST_ttm_FO_adam/20230308-062638/run_None/finetune_mnist_ttm2_r0.9_it0_best.pth.tar'
+  incre: True
+  load_model_path: './runs/pruning/mnist/ttm/ZO_SCD_batch/False/scratch_two_bz64_grad0.5_lr_0.01/20230329-080506/run_None/finetune_mnist_ttm2_r0.9_it0_best.pth.tar'
   pruned: False
 
 run:

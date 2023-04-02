@@ -5,7 +5,7 @@ GraSP:
   dataset: ATIS
   batch_size: 128
   epoch: 160
-  learning_rate: 0.1
+  learning_rate: 0.001
   weight_decay: 1e-4
   exception: -1
   iterations: 1
@@ -19,13 +19,17 @@ GraSP:
   num_iters: 1
 
 optimizer:
-  name: adamw
-  lr: 0.002
-  weight_decay: 0.01
+  name: ADAM
 
 scheduler:
-  name: cosine
-  lr_min: 0.00002
+  name: 'PresetLRScheduler'
+  lr_schedule: {0: 1,
+                100: 0.1}
+
+pretrained:
+  incre: False
+  load_model_path: 'model/ATIS_GraSP_FO_95_best.chkpt'
+  pruned: False
 
 run:
   runs: None

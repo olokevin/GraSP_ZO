@@ -55,7 +55,13 @@ def build_optimizer(config, net, criterion, named_masks, learning_rate, weight_d
             h_smooth = config.optimizer.h_smooth if hasattr(config.optimizer, 'h_smooth') else 0.1,
             grad_estimator = grad_estimator,
             opt_layers_strs = config.optimizer.opt_layers_strs,
-            STP = config.optimizer.STP if hasattr(config.optimizer, 'STP') else False
+            STP = config.optimizer.STP if hasattr(config.optimizer, 'STP') else False,
+            momentum = config.optimizer.momentum if hasattr(config.optimizer, 'momentum') else 0,
+            weight_decay = config.optimizer.weight_decay if hasattr(config.optimizer, 'weight_decay') else 0,
+            dampening = config.optimizer.dampening if hasattr(config.optimizer, 'dampening') else 0,
+            adam = config.optimizer.adam if hasattr(config.optimizer, 'adam') else False,
+            beta_1 = config.optimizer.beta_1 if hasattr(config.optimizer, 'beta_1') else 0.9,
+            beta_2 = config.optimizer.beta_2 if hasattr(config.optimizer, 'beta_2') else 0.98
         )
         return optimizer
     elif config.optimizer.name == 'ZO_SGD_mask':
@@ -120,11 +126,14 @@ def build_optimizer(config, net, criterion, named_masks, learning_rate, weight_d
         )
         return optimizer_SGD, optimizer_SCD
     elif config.optimizer.name == 'SGD':
+        net.requires_grad_(True)
+        # optimizer = optim.SGD(net.parameters(), lr=learning_rate)
         optimizer = optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9, weight_decay=weight_decay)
         return optimizer
     elif config.optimizer.name == 'ADAM':
+        net.requires_grad_(True)
         # optimizer = optim.Adam(list(net.parameters()), lr=learning_rate, weight_decay=weight_decay)
-        optimizer = optim.Adam(net.parameters(), betas=(0.9, 0.98), eps=1e-06, lr = learning_rate)
+        optimizer = optim.Adam(net.parameters(), betas=(0.9, 0.98), eps=1e-06, lr = learning_rate, weight_decay=weight_decay)
         return optimizer
     else:
         raise ValueError(f"Wrong optimizer_name {config.optimizer.name}") 

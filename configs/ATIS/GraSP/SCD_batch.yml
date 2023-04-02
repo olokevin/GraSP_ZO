@@ -1,0 +1,56 @@
+GraSP:
+  exp_name: "scratch_95_grad0.8_lr0.001"
+  network: attn
+  depth: 2
+  dataset: ATIS
+  batch_size: 64
+  epoch: 50
+  learning_rate: 0.001
+  weight_decay: 1e-4
+  exception: -1
+  iterations: 1
+  normalize: false
+  target_ratio: 0.95
+  pruner: GraSP_attn
+  pruner_file: GraSP_attn
+  num_classes: 21
+  samples_per_class: 10
+  samples_batches: 5
+  num_iters: 1
+
+optimizer:
+  name: ZO_SCD_batch
+  grad_estimator: batch
+  grad_sparsity: 0.8
+  opt_layers_strs: ['nn.Linear', 'TensorizedLinear_module']
+  STP: False
+  debug: False
+
+scheduler:
+  name: 'PresetLRScheduler'
+  lr_schedule: {0: 1,
+                25: 0.1}
+
+pretrained:
+  incre: False
+  load_model_path: 'model/ATIS_GraSP_FO_95_best.chkpt'
+  pruned: False
+
+run:
+  runs: None
+  n_epochs: 100
+  batch_size: 32
+  use_cuda: 1
+  gpu_id: 0
+  deterministic: 1
+  log_interval: 200
+  train_noise: 0
+
+model:
+  tensorized: None
+
+checkpoint:
+  save_model: "model/ATIS_notensor_2layers_FP32/GraSP_95"
+  save_mode: "best"
+  proj_share_weight: 1
+  label_smoothing: 1

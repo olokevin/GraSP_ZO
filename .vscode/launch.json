@@ -5,7 +5,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "${workspace}/tensor_train.py",
+      "name": "ATIS_lth",
       "type": "python",
       "request": "launch",
       "program": "${file}",
@@ -15,7 +15,33 @@
       },
       "args": ["-tensorized","0", "-uncompressed","0", "-precondition","0", "-save_model", "model/ATIS_tensor_2layers_FP32",
                "-save_mode", "best", "-proj_share_weight", "-label_smoothing", "-batch_size","64",
-               "-config", "configs/ATIS/GraSP/FO.yml"],
+               "-config", "configs/ATIS/GraSP/SCD.yml"],
+      "justMyCode": true
+    },
+    {
+      "name": "ATIS_ttm",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "env": {
+        "CUDA_VISIBLE_DEVICES": "2"
+      },
+      "args": ["-tensorized","1", "-uncompressed","0", "-precondition","0", "-save_model", "model/ATIS_tensor_2layers_FP32",
+               "-save_mode", "best", "-proj_share_weight", "-label_smoothing", "-batch_size","64",
+               "-config", "configs/ATIS/TTM/FO.yml"],
+      "justMyCode": true
+    },
+    {
+      "name": "MNIST_TTM_ZO_SCD_batch",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "env": {
+        "CUDA_VISIBLE_DEVICES": "2"
+      },
+      "args": ["-config", "configs/MNIST/TTM/SCD_batch.yml"],
       "justMyCode": true
     },
     {
@@ -52,6 +78,18 @@
         "CUDA_VISIBLE_DEVICES": "2"
       },
       "args": ["-config", "configs/MNIST/FC/SCD_esti.yml"],
+      "justMyCode": true
+    },
+    {
+      "name": "MNIST_FC_LTH_ZO_SCD_batch",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "env": {
+        "CUDA_VISIBLE_DEVICES": "2"
+      },
+      "args": ["-config", "configs/MNIST/FC/SCD_batch.yml"],
       "justMyCode": true
     },
     {

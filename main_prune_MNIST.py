@@ -142,7 +142,7 @@ def train(net, loader, optimizer, criterion, lr_scheduler, epoch, writer, iterat
         # loss.backward()
 
         # test, check real grads
-        en_debug = configs.optimizer.debug
+        en_debug = configs.optimizer.debug if hasattr(configs.optimizer,'debug') else False
         if en_debug == True:
             # test_optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
             outputs = net(inputs)
@@ -150,7 +150,8 @@ def train(net, loader, optimizer, criterion, lr_scheduler, epoch, writer, iterat
             loss.backward()
             # test_optimizer.step()
 
-        if isinstance(optimizer, (ZO_SCD_mask, ZO_SCD_esti, ZO_SCD_grad)):
+        # compute gradient and update parameters
+        if isinstance(optimizer, (ZO_SCD_mask)):
             with torch.no_grad():
                 outputs, loss, grads = optimizer.step(inputs, targets, en_debug=en_debug)
         elif isinstance(optimizer, ZO_SGD_mask):
@@ -171,11 +172,23 @@ def train(net, loader, optimizer, criterion, lr_scheduler, epoch, writer, iterat
                     p_norm = torch.linalg.norm(p)
                     grads_err_norm[layer_name][p_name] = p_norm
                     logger.info('epoch[%d], layer: %s, param: %s, grads_err_norm: %.4f' % (epoch, layer_name, p_name, p_norm))
+            
+            grads_path = os.path.join(*['./figs', configs.GraSP.network, configs.optimizer.name, configs.GraSP.exp_name+'/'])
+            makedirs(grads_path)
+
+            if isinstance(optimizer, ZO_SCD_mask):
+                grads_path = os.path.join(grads_path, 'h_'+str(configs.optimizer.h_smooth)+'.pth')
+                # grads_path = os.path.join(configs.GraSP.summary_dir + 'h_'+str(configs.optimizer.h_smooth)+'.pth')
+            elif isinstance(optimizer, ZO_SGD_mask):
+                grads_path = os.path.join(grads_path, 'N_'+str(configs.optimizer.n_sample)+'.pth')
+                # grads_path = os.path.join(configs.GraSP.summary_dir + 'N_'+str(configs.optimizer.n_sample)+'.pth')
+
             # if isinstance(optimizer, ZO_SCD_mask):
-            #     grads_path = os.path.join('./figs/' + configs.optimizer.name + '/h_'+str(configs.optimizer.h_smooth)+'.pth')
+            #     grads_path = os.path.join('./figs/' + configs.GraSP.network + configs.optimizer.name + '/h_'+str(configs.optimizer.h_smooth)+'.pth')
             # elif isinstance(optimizer, ZO_SGD_mask):
-            #     grads_path = os.path.join('./figs/' + configs.optimizer.name + '/N_'+str(configs.optimizer.n_sample)+'.pth')
-            # torch.save(grads, grads_path)
+            #     grads_path = os.path.join('./figs/' + configs.GraSP.network + configs.optimizer.name + '/N_'+str(configs.optimizer.n_sample)+'.pth')
+
+            torch.save(grads, grads_path)
 
         train_loss += loss.item()
         _, predicted = outputs.max(1)
@@ -318,9 +331,10 @@ def main():
     set_torch_deterministic(42)
 
     # ================== Prepare logger ==========================
+    name_append = 'bz{}_grad{}_lr_{}'.format(configs.GraSP.batch_size, configs.optimizer.grad_sparsity, configs.GraSP.learning_rate)
     paths = [configs.GraSP.dataset]
-    summn = [configs.GraSP.network, configs.optimizer.name, str(configs.GraSP.pruner), configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
-    chekn = [configs.GraSP.network, configs.optimizer.name, str(configs.GraSP.pruner), configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
+    summn = [configs.GraSP.network, configs.optimizer.name, str(configs.GraSP.pruner), configs.GraSP.exp_name, name_append, time.strftime("%Y%m%d-%H%M%S")]
+    chekn = [configs.GraSP.network, configs.optimizer.name, str(configs.GraSP.pruner), configs.GraSP.exp_name, name_append, time.strftime("%Y%m%d-%H%M%S")]
     if configs.run.runs is not None:
         summn.append('run_%s/' % configs.run.runs)
         chekn.append('run_%s/' % configs.run.runs)
@@ -345,6 +359,7 @@ def main():
     logger.info(dict(configs.optimizer))
     logger.info(dict(configs.scheduler))
     logger.info(dict(configs.model))
+    logger.info(os.getpid())
     
     # ====================================== graph and stat ======================================
     # t_batch = next(iter(training_data))
@@ -399,6 +414,8 @@ def main():
     if hasattr(configs, 'pretrained') and configs.pretrained.incre == True and configs.pretrained.pruned == True:
         masks = model_state['masks']
         named_masks = model_state['named_masks']
+        # keep pruned params 0
+        mb.register_mask(masks, forward_hook=True)
     # generate mask this time
     elif configs.GraSP.pruner != False:
         # ================== start pruning ==================

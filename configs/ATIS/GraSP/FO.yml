@@ -23,7 +23,6 @@ optimizer:
 
 scheduler:
   name: 'PresetLRScheduler'
-  gamma: 0.985
   lr_schedule: {0: 1,
                 20: 0.1,
                 50: 0.01}
@@ -31,7 +30,7 @@ scheduler:
 pretrained:
   incre: False
   load_model_path: 'model/ATIS_GraSP_FO_95_best.chkpt'
-  pruner: GraSP_attn
+  pruned: False
 
 run:
   runs: None

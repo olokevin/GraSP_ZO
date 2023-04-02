@@ -128,16 +128,18 @@ def collate_fn_custom(batch):
 
 # ==================== GraSP methods ====================
 def init_logger(config):
-    makedirs(config.summary_dir)
-    makedirs(config.checkpoint_dir)
+    # makedirs(config.summary_dir)
+    # makedirs(config.checkpoint_dir)
 
     # set logger
     path = os.path.dirname(os.path.abspath(__file__))
     path_model = os.path.join(path, 'tensor_layers/Transformer_tensor/%s.py' % config.network.lower())
     path_main = os.path.join(path, 'tensor_train.py')
     path_pruner = os.path.join(path, 'pruner/%s.py' % config.pruner_file)
-    logger = get_logger('log', logpath=config.summary_dir + '/',
-                        filepath=path_model, package_files=[path_main, path_pruner], displaying=False)
+    # logger = get_logger('log', logpath=config.summary_dir + '/',
+    #                     filepath=path_model, package_files=[path_main, path_pruner])
+    logger = get_logger('log', logpath=config.summary_dir,
+                        filepath=path_model, package_files=[path_main, path_pruner])
     logger.info(dict(config))
     writer = SummaryWriter(config.summary_dir)
     # sys.stdout = open(os.path.join(config.summary_dir, 'stdout.txt'), 'w+')
@@ -422,11 +424,11 @@ def main():
     
     # ================== Prepare logger ==========================
     paths = [configs.GraSP.dataset]
-    summn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
-    chekn = [configs.GraSP.network, configs.optimizer.name, configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
+    summn = [configs.GraSP.network, configs.optimizer.name, str(configs.GraSP.pruner), configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
+    chekn = [configs.GraSP.network, configs.optimizer.name, str(configs.GraSP.pruner), configs.GraSP.exp_name, time.strftime("%Y%m%d-%H%M%S")]
     if configs.run.runs is not None:
-        summn.append('run_%s' % configs.run.runs)
-        chekn.append('run_%s' % configs.run.runs)
+        summn.append('run_%s/' % configs.run.runs)
+        chekn.append('run_%s/' % configs.run.runs)
     # summn.append("summary/")
     # chekn.append("checkpoint/")
     summary_dir = ["./runs/pruning"] + paths + summn
@@ -571,56 +573,61 @@ def main():
     # lr = 1e-3
 
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+    learning_rate = learning_rates
+    weight_decay = weight_decays
     
-    if configs.optimizer.name == 'ZO_SCD_mask':
-        optimizer_notensor = ZO_SCD_mask(
-                model = model, 
-                criterion = criterion,
-                masks = named_masks,
-                lr = learning_rates,
-                grad_sparsity = configs.optimizer.grad_sparsity,
-                tensorized = 'None'
-            )
-        optimizer_tensor = ZO_SCD_mask(
-                model = model, 
-                criterion = criterion,
-                masks = named_masks,
-                lr = learning_rates,
-                grad_sparsity = configs.optimizer.grad_sparsity,
-                tensorized = configs.model.tensorized
-            )
-    elif configs.optimizer.name == 'ZO_SGD_mask':
-        optimizer_notensor = ZO_SGD_mask(
-            model = model, 
-            criterion = criterion,
-            masks = named_masks,
-            lr = learning_rates,
-            sigma = configs.optimizer.sigma,
-            n_sample  = configs.optimizer.n_sample,
-            signSGD = configs.optimizer.signSGD,
-            layer_by_layer = configs.optimizer.layer_by_layer,
-            tensorized = 'None'
-        )
-        optimizer_tensor = ZO_SGD_mask(
-            model = model, 
-            criterion = criterion,
-            masks = named_masks,
-            lr = learning_rates,
-            sigma = configs.optimizer.sigma,
-            n_sample  = configs.optimizer.n_sample,
-            signSGD = configs.optimizer.signSGD,
-            layer_by_layer = configs.optimizer.layer_by_layer,
-            tensorized = configs.model.tensorized
-        )
-    elif  configs.optimizer.name == 'ADAM':
-        optimizer_tensor = optim.Adam(filter(lambda x: x.requires_grad, tensor_blocks.parameters()),betas=(0.9, 0.98), eps=1e-06, lr = learning_rates)
-        optimizer_notensor = optim.Adam(layer_notensor.parameters(), betas=(0.9, 0.98), eps=1e-06, lr = learning_rates)
-    else:
-        raise ValueError(f"Wrong optimizer_name {configs.optimizer.name}") 
+    # if configs.optimizer.name == 'ZO_SCD_mask':
+    #     optimizer_notensor = ZO_SCD_mask(
+    #             model = model, 
+    #             criterion = criterion,
+    #             masks = named_masks,
+    #             lr = learning_rates,
+    #             grad_sparsity = configs.optimizer.grad_sparsity,
+    #             tensorized = 'None'
+    #         )
+    #     optimizer_tensor = ZO_SCD_mask(
+    #             model = model, 
+    #             criterion = criterion,
+    #             masks = named_masks,
+    #             lr = learning_rates,
+    #             grad_sparsity = configs.optimizer.grad_sparsity,
+    #             tensorized = configs.model.tensorized
+    #         )
+    # elif configs.optimizer.name == 'ZO_SGD_mask':
+    #     optimizer_notensor = ZO_SGD_mask(
+    #         model = model, 
+    #         criterion = criterion,
+    #         masks = named_masks,
+    #         lr = learning_rates,
+    #         sigma = configs.optimizer.sigma,
+    #         n_sample  = configs.optimizer.n_sample,
+    #         signSGD = configs.optimizer.signSGD,
+    #         layer_by_layer = configs.optimizer.layer_by_layer,
+    #         tensorized = 'None'
+    #     )
+    #     optimizer_tensor = ZO_SGD_mask(
+    #         model = model, 
+    #         criterion = criterion,
+    #         masks = named_masks,
+    #         lr = learning_rates,
+    #         sigma = configs.optimizer.sigma,
+    #         n_sample  = configs.optimizer.n_sample,
+    #         signSGD = configs.optimizer.signSGD,
+    #         layer_by_layer = configs.optimizer.layer_by_layer,
+    #         tensorized = configs.model.tensorized
+    #     )
+    # elif  configs.optimizer.name == 'ADAM':
+    #     optimizer_tensor = optim.Adam(filter(lambda x: x.requires_grad, tensor_blocks.parameters()),betas=(0.9, 0.98), eps=1e-06, lr = learning_rates)
+    #     optimizer_notensor = optim.Adam(layer_notensor.parameters(), betas=(0.9, 0.98), eps=1e-06, lr = learning_rates)
+    # else:
+    #     raise ValueError(f"Wrong optimizer_name {configs.optimizer.name}") 
 
     
-    # optimizers = build_optimizer(configs, model, criterion, named_masks, learning_rates, weight_decays)
-    lr_scheduler = build_scheduler(configs, optimizer_tensor, learning_rates)
+    # ================== optimizer ======================
+    optimizers = build_optimizer(configs, model, criterion, named_masks, learning_rate, weight_decay)
+    
+    # ================== scheduler ======================
+    lr_schedulers = build_scheduler(configs, optimizers, learning_rate)
 
     # ===================== Zi Yang's optimzier setting =====================
     
@@ -652,18 +659,18 @@ def main():
     test_result = []
     for epoch in range(training_epochs):
         # ========================== Setup Optimizer ==========================
-        # # mix training selection
-        # if configs.optimizer.name == 'ZO_mix':
-        #     if epoch < configs.optimizer.switch_epoch:
-        #         optimizer = optimizers[0]
-        #         lr_scheduler = lr_schedulers[0]
-        #     else:
-        #         optimizer = optimizers[1]
-        #         lr_scheduler = lr_schedulers[1]
-        # # single training
-        # else:
-        #     optimizer = optimizers
-        #     lr_scheduler = lr_schedulers
+        # mix training selection
+        if configs.optimizer.name == 'ZO_mix':
+            if epoch < configs.optimizer.switch_epoch:
+                optimizer = optimizers[0]
+                lr_scheduler = lr_schedulers[0]
+            else:
+                optimizer = optimizers[1]
+                lr_scheduler = lr_schedulers[1]
+        # single training
+        else:
+            optimizer = optimizers
+            lr_scheduler = lr_schedulers
         
         start = time.time()
 
@@ -675,17 +682,16 @@ def main():
         #     now_lr = optimizer.state_dict()['param_groups'][0]['lr']
         
         if isinstance(lr_scheduler, PresetLRScheduler):
-            lr_scheduler(optimizer_notensor, epoch)
-            lr_scheduler(optimizer_tensor, epoch)
-            now_lr = lr_scheduler.get_lr(optimizer_tensor)
+            lr_scheduler(optimizer, epoch)
+            now_lr = lr_scheduler.get_lr(optimizer)
         else:
             pass
         
         train_loss, train_accu, train_slot_accu = train_epoch_bylayer(
             transformer, training_data,
             Loss=criterion,
-            optimizer_notensor=optimizer_notensor,
-            optimizer_tensor=optimizer_tensor,
+            optimizer=optimizer,
+            logger = logger,
             precondition=precondition,device=device,tensor_blocks=tensor_blocks,
             step=epoch)
 
@@ -711,24 +717,43 @@ def main():
 
         train_loss_new = 0
         
-        print('')
-        print('epoch = ', epoch)
+        # print('')
+        # print('epoch = ', epoch)
         
-        print('  - (Training)   loss: {loss: 8.5f}, loss_hard: {loss_new: 8.5f}, accuracy: {accu:3.3f} %, slot accuracy: {slot_accu:3.3f},'\
+        # print('  - (Training)   loss: {loss: 8.5f}, loss_hard: {loss_new: 8.5f}, accuracy: {accu:3.3f} %, slot accuracy: {slot_accu:3.3f},'\
+        #     'elapse: {elapse:3.3f} min'.format(
+        #         loss=train_loss, loss_new=train_loss_new, accu=100*train_accu, slot_accu = 100*train_slot_accu,
+        #         elapse=(start_val-start)/60))
+       
+        
+        # print('  - (Validation) loss: {loss: 8.5f}, accuracy: {accu:3.3f} %, slot accuracy: {slot_accu:3.3f},'\
+        #         'elapse: {elapse:3.3f} min'.format(
+        #             loss=valid_loss, accu=100*valid_accu,slot_accu = 100*valid_slot_accu,
+        #             elapse=(end-start_val)/60))
+
+        # print('  - (Test) loss: {loss: 8.5f}, accuracy: {accu:3.3f} %, slot accuracy: {slot_accu:3.3f},'\
+        #         'elapse: {elapse:3.3f} min'.format(
+        #             loss=test_loss, accu=100*test_accu,slot_accu = 100*test_slot_accu,
+        #             elapse=(end-start_val)/60))
+        
+        logger.info('epoch = %d' % epoch)
+        
+        logger.info('  - (Training)   loss: {loss: 8.5f}, loss_hard: {loss_new: 8.5f}, accuracy: {accu:3.3f} %, slot accuracy: {slot_accu:3.3f},'\
             'elapse: {elapse:3.3f} min'.format(
                 loss=train_loss, loss_new=train_loss_new, accu=100*train_accu, slot_accu = 100*train_slot_accu,
                 elapse=(start_val-start)/60))
        
         
-        print('  - (Validation) loss: {loss: 8.5f}, accuracy: {accu:3.3f} %, slot accuracy: {slot_accu:3.3f},'\
+        logger.info('  - (Validation) loss: {loss: 8.5f}, accuracy: {accu:3.3f} %, slot accuracy: {slot_accu:3.3f},'\
                 'elapse: {elapse:3.3f} min'.format(
                     loss=valid_loss, accu=100*valid_accu,slot_accu = 100*valid_slot_accu,
                     elapse=(end-start_val)/60))
 
-        print('  - (Test) loss: {loss: 8.5f}, accuracy: {accu:3.3f} %, slot accuracy: {slot_accu:3.3f},'\
+        logger.info('  - (Test) loss: {loss: 8.5f}, accuracy: {accu:3.3f} %, slot accuracy: {slot_accu:3.3f},'\
                 'elapse: {elapse:3.3f} min'.format(
                     loss=test_loss, accu=100*test_accu,slot_accu = 100*test_slot_accu,
                     elapse=(end-start_val)/60))
+        
         
         # full_model_name = './model/' + configs.GraSP.exp_name + '.chkpt'
         # torch.save(transformer.state_dict(),best_model_name)
@@ -750,7 +775,7 @@ def main():
     PATH_np = './model/' + configs.GraSP.exp_name + '.npy'
     np.save(PATH_np,np.array([train_result,test_result]))
 
-def train_epoch_bylayer(model, training_data, Loss, optimizer_notensor, optimizer_tensor, tensor_blocks=None,precondition=False,device='cuda',step=1):
+def train_epoch_bylayer(model, training_data, Loss, optimizer, logger, tensor_blocks=None,precondition=False,device='cuda',step=1):
     ''' Epoch operation in training phase'''
 
     model.train()
@@ -776,18 +801,20 @@ def train_epoch_bylayer(model, training_data, Loss, optimizer_notensor, optimize
 
         target, w1, slot_label,attn,seg= map(lambda x: x.to(device), batch)
 
-        optimizer_tensor.zero_grad()
-        optimizer_notensor.zero_grad()
-
         # attn = None
         # model.eval()
         
         memory = torch.cuda.max_memory_allocated()/1024/1024/1024
         max_memory = max(max_memory,memory)
 
+        # epoch wise decay
+        # if isinstance(lr_scheduler, optim.lr_scheduler.ExponentialLR):
+        #     if hasattr(configs.scheduler, 'epoch_wise') and configs.scheduler.epoch_wise == True:
+        #         lr_scheduler.step()
+
         inputs = (w1, attn, seg)
         targets = (target, slot_label)
-
+        optimizer.zero_grad()
         # Forward
         pred,pred_slot = model(w1,attn=attn,seg=seg)
         pred_slot = torch.flatten(pred_slot,start_dim=0, end_dim=1)
@@ -796,21 +823,51 @@ def train_epoch_bylayer(model, training_data, Loss, optimizer_notensor, optimize
         loss_MLM =  Loss(pred_slot, slot_label)
         loss = Loss(pred,target)  + loss_MLM
 
-        # FO / ZO
-        if isinstance(optimizer_tensor, ZO_SCD_mask):
-            optimizer_tensor.step(inputs, targets, ATIS=True)
-        elif isinstance(optimizer_tensor, ZO_SGD_mask):
-            optimizer_tensor.step(inputs, targets, ATIS=True)
-        else:
+        # test, check real grads
+        en_debug = configs.optimizer.debug if hasattr(configs.optimizer, 'debug') else False
+        if en_debug == True:
+            # test_optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+            # pred,pred_slot = model(w1,attn=attn,seg=seg)
+            # pred_slot = torch.flatten(pred_slot,start_dim=0, end_dim=1)
+            # slot_label = torch.flatten(slot_label,start_dim=0, end_dim=1)
+
+            # loss_MLM =  Loss(pred_slot, slot_label)
+            # loss = Loss(pred,target)  + loss_MLM
             loss.backward()
-            optimizer_tensor.step()
-        
-        if isinstance(optimizer_notensor, ZO_SCD_mask):
-            optimizer_notensor.step(inputs, targets, ATIS=True)
-        elif isinstance(optimizer_notensor, ZO_SGD_mask):
-            optimizer_notensor.step(inputs, targets, ATIS=True)
+            # test_optimizer.step()
+
+        # compute gradient and update parameters
+        if isinstance(optimizer, (ZO_SCD_mask)):
+            with torch.no_grad():
+                (pred, pred_slot), loss, grads = optimizer.step(inputs, targets, en_debug=en_debug, ATIS=True)
+        elif isinstance(optimizer, ZO_SGD_mask):
+            with torch.no_grad():
+                (pred, pred_slot), loss, grads = optimizer.step(inputs, targets, en_debug=en_debug, ATIS=True)
         else:
-            optimizer_notensor.step()
+            pred,pred_slot = model(w1,attn=attn,seg=seg)
+            pred_slot = torch.flatten(pred_slot,start_dim=0, end_dim=1)
+            slot_label = torch.flatten(slot_label,start_dim=0, end_dim=1)
+
+            loss_MLM =  Loss(pred_slot, slot_label)
+            loss = Loss(pred,target)  + loss_MLM
+            loss.backward()
+            optimizer.step()
+
+        if en_debug == True:
+            grads_err = grads[2]
+            grads_err_norm = dict()
+            for layer_name, layer_params in grads_err.items():
+                grads_err_norm[layer_name] = dict()
+                for p_name, p in layer_params.items():
+                    p_norm = torch.linalg.norm(p)
+                    grads_err_norm[layer_name][p_name] = p_norm
+                    print('layer: %s, param: %s, grads_err_norm: %.4f' % (layer_name, p_name, p_norm))
+            # if isinstance(optimizer, ZO_SCD_mask):
+            #     grads_path = os.path.join('./figs/' + configs.optimizer.name + '/h_'+str(configs.optimizer.h_smooth)+'.pth')
+            # elif isinstance(optimizer, ZO_SGD_mask):
+            #     grads_path = os.path.join('./figs/' + configs.optimizer.name + '/N_'+str(configs.optimizer.n_sample)+'.pth')
+            # torch.save(grads, grads_path)
+
             
         # print('ZO=',model.encoder.layer_stack[-1].slf_attn.w_ks.tensor.factors[2].grad[1,:10,1])
 
@@ -859,24 +916,10 @@ def train_epoch_bylayer(model, training_data, Loss, optimizer_notensor, optimize
         # print(torch.argmax(pred,dim=1)[:10])
         # print(target[:10])
         # print(pred[:10,:])
-        count += 1
-        
-        # if count == 2:
-        #     break
-        
 
-
-        if count%500==0:
-            print('loss = ', total_loss/n_word_total)
-            print('acc = ', n_word_correct/n_word_total)
-            print("torch.cuda.memory_allocated: %fGB"%(max_memory))
-            # for p in model.parameters():
-            #     if p.grad!=None:
-            #         print(p[0])
-            #         print('grad=', p.grad[0])
-            #         break
-        # if count==10:
-        #     break
+        logger.info('loss = %.4f' % (total_loss/n_word_total))
+        logger.info('acc = %.4f' % (n_word_correct/n_word_total))
+        logger.info("torch.cuda.memory_allocated: %fGB"%(max_memory))
 
     loss_per_word = total_loss/n_word_total
     accuracy = n_word_correct/n_word_total

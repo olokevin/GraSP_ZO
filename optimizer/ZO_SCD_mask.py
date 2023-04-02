@@ -46,7 +46,14 @@ class ZO_SCD_mask(Optimizer):
         h_smooth: float = 0.001,
         grad_estimator: str = 'sign',
         opt_layers_strs: list = [],
-        STP: bool = True
+        STP: bool = True,
+        momentum: float = 0,
+        weight_decay: float = 0,
+        dampening: float = 0,
+        adam: bool = False,
+        beta_1: float = 0.9,
+        beta_2: float = 0.98,
+        eps: float = 1e-06
     ):
         defaults = dict(lr=lr)
         super().__init__(model.parameters(), defaults)
@@ -60,6 +67,19 @@ class ZO_SCD_mask(Optimizer):
         self.grad_estimator = grad_estimator
         self.opt_layers_strs = opt_layers_strs
         self.STP = STP
+        
+        self.momentum = momentum
+        self.weight_decay = weight_decay
+        self.dampening = dampening
+
+        self.adam = adam
+        self.beta_1 = beta_1
+        self.beta_2 = beta_2
+        self.eps = eps
+
+        # initialize
+        self.m_t = None
+        self.v_t = None
 
         self.init_state()
 
@@ -285,11 +305,86 @@ class ZO_SCD_mask(Optimizer):
         return y, old_loss
 
     # ============ apply gradients all together ============
-    def _apply_gradients(self, params, grad, lr):
-        return {
-            layer_name: {p_name: p.sub_(grad[layer_name][p_name] * lr) for p_name, p in layer_params.items()}
-            for layer_name, layer_params in params.items()
-        }
+    # def _apply_gradients(self, params, grad, lr):
+    #     return {
+    #         layer_name: {p_name: p.sub_(grad[layer_name][p_name] * lr) for p_name, p in layer_params.items()}
+    #         for layer_name, layer_params in params.items()
+    #     }
+
+    # ============ apply gradients with momentum weight_decay dampening ============
+    def _apply_gradients(self, params, grads, lr):
+        # ============ ADAM ============
+        if self.adam == True:
+            # weight_decay
+            if self.weight_decay != 0:
+                grads_t = {
+                    layer_name: {
+                        p_name: grads[layer_name][p_name] + self.weight_decay * params[layer_name][p_name]
+                        for p_name, p in layer_params.items()
+                    }
+                    for layer_name, layer_params in params.items()
+                }     
+            else:
+                grads_t = grads
+            
+            # t = 0, initialize bts (dict)
+            if self.m_t is None:
+                self.m_t = copy.deepcopy(grads_t)
+                self.beta_1_t = self.beta_1
+            else:
+                for layer_name, layer_params in params.items():
+                    for p_name, p in layer_params.items():
+                        self.m_t[layer_name][p_name] = (self.beta_1 * self.m_t[layer_name][p_name] + (1-self.beta_1)*grads_t[layer_name][p_name]) / (1-self.beta_1_t)
+                self.beta_1_t = self.beta_1_t * self.beta_1
+            
+            if self.v_t is None:
+                self.v_t = copy.deepcopy(grads_t)
+                for layer_name, layer_params in params.items():
+                    for p_name, p in layer_params.items():
+                        self.v_t[layer_name][p_name] = grads_t[layer_name][p_name] * grads_t[layer_name][p_name]
+                self.beta_2_t = self.beta_2
+            else:
+                for layer_name, layer_params in params.items():
+                    for p_name, p in layer_params.items():
+                        self.v_t[layer_name][p_name] = (self.beta_2 * self.v_t[layer_name][p_name] + (1-self.beta_2) * grads_t[layer_name][p_name] * grads_t[layer_name][p_name]) / (1-self.beta_2_t)
+                self.beta_2_t = self.beta_2_t * self.beta_2
+
+            # print(self.global_step)
+            return {
+                layer_name: {
+                    p_name: p.sub_(self.m_t[layer_name][p_name] / (torch.sqrt(self.v_t[layer_name][p_name]) + self.eps) * lr) 
+                    for p_name, p in layer_params.items()
+                }
+                for layer_name, layer_params in params.items()
+            }
+         # ============ SGD ============
+        else:
+            if self.weight_decay != 0:
+                grads_t = {
+                    layer_name: {
+                        p_name: grads[layer_name][p_name] + self.weight_decay * params[layer_name][p_name]
+                        for p_name, p in layer_params.items()
+                    }
+                    for layer_name, layer_params in params.items()
+                }     
+            else:
+                grads_t = grads
+            
+            # t = 0, initialize bts (dict)
+            if self.m_t is None:
+                self.m_t = copy.deepcopy(grads_t)
+            elif self.momentum != 0:
+                for layer_name, layer_params in params.items():
+                    for p_name, p in layer_params.items():
+                        self.m_t[layer_name][p_name] = self.momentum * self.m_t[layer_name][p_name] + (1-self.dampening)*grads_t[layer_name][p_name]
+            else:
+                self.m_t = grads_t
+            
+            return {
+                layer_name: {p_name: p.sub_(self.m_t[layer_name][p_name] * lr) for p_name, p in layer_params.items()}
+                for layer_name, layer_params in params.items()
+            }
+        
 
     def zo_coordinate_descent_batch(self, obj_fn, params):
         """
@@ -354,7 +449,6 @@ class ZO_SCD_mask(Optimizer):
 
             grads[layer_name] = layer_grads
 
-        # different from others!
         self._apply_gradients(params, grads, lr)
         return y, old_loss, grads
     
@@ -408,7 +502,7 @@ class ZO_SCD_mask(Optimizer):
 
                             param_grad[idx] = (pos_loss-neg_loss)/2/self.h_smooth
                         else:
-                            param_grad[idx] = (pos_loss-old_loss)/2/self.h_smooth
+                            param_grad[idx] = (pos_loss-old_loss)/self.h_smooth
                         
                         p.data[idx] = old_value
                         # self.commit(layer_name, p_name, p)

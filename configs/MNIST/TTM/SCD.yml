@@ -1,11 +1,11 @@
 GraSP:
-  exp_name: "incre_bz4096_lr0.0005_grad0.8"
+  exp_name: "benchmark_bz128_lr0.01_grad0.5"
   network: ttm
   depth: 2
   dataset: mnist
-  batch_size: 4096
-  epoch: 10
-  learning_rate: 0.0005
+  batch_size: 128
+  epoch: 40
+  learning_rate: 0.01
   weight_decay: 1e-4
   exception: -1
   iterations: 1
@@ -21,7 +21,7 @@ GraSP:
 optimizer:
   name: ZO_SCD_mask
   grad_estimator: sign
-  grad_sparsity: 0.8
+  grad_sparsity: 0.5
   opt_layers_strs: 'TensorizedLinear_module'
   STP: False
   debug: False
@@ -29,8 +29,8 @@ optimizer:
 scheduler:
   name: 'PresetLRScheduler'
   lr_schedule: {0: 1,
-                3: 0.1,
-                6: 0.01}
+                5: 0.1,
+                25: 0.01}
 
 # scheduler:
 #   name: 'ExponentialLR'
@@ -48,7 +48,7 @@ run:
   train_noise: 0
 
 pretrained:
-  incre: True
+  incre: False
   load_model_path: './runs/pruning/mnist/ttm/ADAM/MNIST_ttm_FO_adam/20230308-062638/run_None/finetune_mnist_ttm2_r0.9_it0_best.pth.tar'
   pruned: False
 

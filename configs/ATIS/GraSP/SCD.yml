@@ -1,5 +1,5 @@
 GraSP:
-  exp_name: "ATIS_GraSP_SCD_95_incre"
+  exp_name: "scratch_95_grad0.5_lr0.001"
   network: attn
   depth: 2
   dataset: ATIS
@@ -22,7 +22,7 @@ optimizer:
   name: ZO_SCD_sign
   grad_estimator: sign
   grad_sparsity: 0.5
-  opt_layers_strs: 'nn.Linear, TensorizedLinear_module'
+  opt_layers_strs: ['nn.Linear', 'TensorizedLinear_module']
   STP: False
   debug: False
 
