@@ -427,13 +427,12 @@ class ZO_SCD_mask(Optimizer):
                         # self.commit(layer_name, p_name, p)
                         y, pos_loss = obj_fn()
                         self.forward_counter += 1
-
-                        p.data[idx] = neg_perturbed_value
-                        # self.commit(layer_name, p_name, p)
-                        y, neg_loss = obj_fn()
-                        self.forward_counter += 1
-
+                        
                         if self.STP == True:
+                            p.data[idx] = neg_perturbed_value
+                            # self.commit(layer_name, p_name, p)
+                            y, neg_loss = obj_fn()
+                            self.forward_counter += 1
                             loss_list = [old_loss, pos_loss, neg_loss]
                             grad_list = [0, -1, 1]
                         else:
@@ -542,6 +541,8 @@ class ZO_SCD_mask(Optimizer):
             return (pred, pred_slot), loss
         return _obj_fn
     
+    # ==================== For MNIST ====================
+    
     def step(self, data, target, en_debug=False, ATIS=False):
         if ATIS == True:
             self.obj_fn = self.build_obj_fn_ATIS(data, target, self.model, self.criterion)
@@ -550,6 +551,38 @@ class ZO_SCD_mask(Optimizer):
             
         if self.grad_estimator == 'sign':
             y, loss = self.zo_coordinate_descent_sign(self.obj_fn, self.trainable_params)
+            grads_zo = None
+        elif self.grad_estimator == 'batch':
+            y, loss, grads_zo = self.zo_coordinate_descent_batch(self.obj_fn, self.trainable_params)
+        elif self.grad_estimator == 'esti':
+            y, loss, grads_zo = self.zo_coordinate_descent_esti(self.obj_fn, self.trainable_params)
+        # update internal parameters
+        self.global_step += 1
+        # output gradients
+        if en_debug == True:
+            grads_fo = self.extract_grad_fo(self.model)
+            grads_err = self.cal_grad_err(self.trainable_params, grads_zo, grads_fo)
+            return y, loss, (grads_zo, grads_fo, grads_err)
+        else:
+            return y, loss, grads_zo
+    
+    # ==================== For PINNs ====================
+    def build_obj_fn_pinn(self, model, dataset, loss_fn):
+        def _obj_fn():
+            train_loss = loss_fn(model=model, dataset=dataset)
+            y = False
+            return y, train_loss
+
+        return _obj_fn
+    
+    def step_pinn(self, model, dataset, loss_fn, en_debug=False):
+        self.obj_fn = self.build_obj_fn_pinn(model, dataset, loss_fn)
+        
+        if self.grad_estimator == 'sign':
+            y, loss = self.zo_coordinate_descent_sign(self.obj_fn, self.trainable_params, STP=False)
+            grads_zo = None
+        elif self.grad_estimator == 'STP':
+            y, loss = self.zo_coordinate_descent_sign(self.obj_fn, self.trainable_params, STP=True)
             grads_zo = None
         elif self.grad_estimator == 'batch':
             y, loss, grads_zo = self.zo_coordinate_descent_batch(self.obj_fn, self.trainable_params)

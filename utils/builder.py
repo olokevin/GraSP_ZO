@@ -127,8 +127,8 @@ def build_optimizer(config, net, criterion, named_masks, learning_rate, weight_d
         return optimizer_SGD, optimizer_SCD
     elif config.optimizer.name == 'SGD':
         net.requires_grad_(True)
-        # optimizer = optim.SGD(net.parameters(), lr=learning_rate)
-        optimizer = optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9, weight_decay=weight_decay)
+        optimizer = optim.SGD(net.parameters(), lr=learning_rate)
+        # optimizer = optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9, weight_decay=weight_decay)
         return optimizer
     elif config.optimizer.name == 'ADAM':
         net.requires_grad_(True)

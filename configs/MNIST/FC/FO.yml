@@ -1,11 +1,11 @@
 GraSP:
-  exp_name: "incre_95_FO_sgd"
+  exp_name: "scratch_vanilla"
   network: fc
   depth: 2
   dataset: mnist
-  batch_size: 128
+  batch_size: 64
   epoch: 10
-  learning_rate: 0.01
+  learning_rate: 0.001
   weight_decay: 1e-4
   exception: -1
   iterations: 1
@@ -24,13 +24,12 @@ optimizer:
 
 scheduler:
   name: 'PresetLRScheduler'
-  gamma: 0.985
   lr_schedule: {0: 1,
-                5: 0.1,
+                10: 0.1,
                 20: 0.01}
 
 pretrained:
-  incre: True
+  incre: False
   load_model_path: './runs/pruning/mnist/fc/ZO_SCD_mask/GraSP/scratch_95_grad0.5_lr0.01/20230324-220530/run_None/finetune_mnist_fc2_r0.95_it0_best.pth.tar'
   pruned: True
 

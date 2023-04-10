@@ -1,11 +1,11 @@
 GraSP:
-  exp_name: "benchmark_bz128_lr0.01_grad0.5"
+  exp_name: "scratch_mom0.9"
   network: ttm
   depth: 2
   dataset: mnist
-  batch_size: 128
-  epoch: 40
-  learning_rate: 0.01
+  batch_size: 64
+  epoch: 150
+  learning_rate: 0.001
   weight_decay: 1e-4
   exception: -1
   iterations: 1
@@ -19,18 +19,19 @@ GraSP:
   num_iters: 1
 
 optimizer:
-  name: ZO_SCD_mask
+  name: ZO_SCD_sign
   grad_estimator: sign
   grad_sparsity: 0.5
   opt_layers_strs: 'TensorizedLinear_module'
   STP: False
   debug: False
+  momentum: 0.9
 
 scheduler:
   name: 'PresetLRScheduler'
   lr_schedule: {0: 1,
-                5: 0.1,
-                25: 0.01}
+                20: 0.1,
+                75: 0.01}
 
 # scheduler:
 #   name: 'ExponentialLR'
@@ -48,8 +49,13 @@ run:
   train_noise: 0
 
 pretrained:
-  incre: False
-  load_model_path: './runs/pruning/mnist/ttm/ADAM/MNIST_ttm_FO_adam/20230308-062638/run_None/finetune_mnist_ttm2_r0.9_it0_best.pth.tar'
+  incre: True
+  # 88.91
+  # load_model_path: './runs/pruning/mnist/ttm/ZO_SCD_batch/False/scratch_two_bz64_grad0.5_lr_0.01/20230329-080506/run_None/finetune_mnist_ttm2_r0.9_it0_best.pth.tar'
+  # 91.31
+  load_model_path: './runs/pruning/mnist/ttm/ZO_SCD_batch/False/incre_bz64_grad0.5_lr_0.001/20230329-092109/run_None/finetune_mnist_ttm2_r0.9_it0_best.pth.tar'
+  # 93.06
+  # load_model_path: './runs/pruning/mnist/ttm/ZO_SCD_batch/False/incre_mom0.9_bz64_grad0.5_lr_0.001/20230329-183037/run_None/finetune_mnist_ttm2_r0.9_it0_best.pth.tar'
   pruned: False
 
 model:

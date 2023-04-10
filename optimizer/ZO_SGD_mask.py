@@ -418,3 +418,28 @@ class ZO_SGD_mask(Optimizer):
             return y, loss, (grads_zo, grads_fo, grads_err)
         else:
             return y, loss, grads_zo
+    
+    # ==================== For PINNs ====================
+    def build_obj_fn_pinn(self, model, dataset, loss_fn):
+        def _obj_fn():
+            train_loss = loss_fn(model=model, dataset=dataset)
+            y = False
+            return y, train_loss
+
+        return _obj_fn
+    
+    def step_pinn(self, model, dataset, loss_fn, en_debug=False):
+        self.obj_fn = self.build_obj_fn_pinn(model, dataset, loss_fn)
+        
+        if self.layer_by_layer == False:
+            y, loss, grads_zo = self.zo_gradient_descent_all(self.obj_fn, self.trainable_params)
+        else:
+            y, loss, grads_zo = self.zo_gradient_descent(self.obj_fn, self.trainable_params)
+        # update internal parameters
+        self.global_step += 1
+        if en_debug == True:
+            grads_fo = self.extract_grad_fo(self.model)
+            grads_err = self.cal_grad_err(self.trainable_params, grads_zo, grads_fo)
+            return y, loss, (grads_zo, grads_fo, grads_err)
+        else:
+            return y, loss, grads_zo

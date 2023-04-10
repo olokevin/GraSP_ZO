@@ -197,7 +197,7 @@ class TensorizedLinear_module(nn.Module):
             stdv = 1. / math.sqrt(out_features)
             # self.bias = torch.nn.Parameter(torch.zeros(out_features))
             # self.bias.data.uniform_(-stdv, stdv)
-            self.bias = torch.nn.Parameter(torch.randn(out_features))
+            self.bias = torch.nn.Parameter(torch.randn(out_features)).to(device)
             self.bias.data.uniform_(-stdv, stdv)
     def get_kl(self):
         return self.tensor.get_kl_divergence_to_prior()

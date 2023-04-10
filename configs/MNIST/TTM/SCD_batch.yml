@@ -1,10 +1,10 @@
 GraSP:
-  exp_name: "incre_91.31_mom0.9"
+  exp_name: "scratch_STP_mom0.9"
   network: ttm
   depth: 2
   dataset: mnist
-  batch_size: 60000
-  epoch: 100
+  batch_size: 64
+  epoch: 200
   learning_rate: 0.001
   weight_decay: 1e-4
   exception: -1
@@ -21,12 +21,12 @@ GraSP:
 optimizer:
   name: ZO_SCD_batch
   grad_estimator: batch
-  grad_sparsity: 0.1
+  grad_sparsity: 0.5
   opt_layers_strs: 'TensorizedLinear_module'
-  STP: False
+  STP: True
   debug: False
   momentum: 0.9
-  # weight_decay: 0.000001
+  weight_decay: 0.0001
   # adam: True
   # beta_1: 0.9
   # beta_2: 0.98
@@ -34,8 +34,9 @@ optimizer:
 scheduler:
   name: 'PresetLRScheduler'
   lr_schedule: {0: 1,
-                30: 0.1,
-                80: 0.01}
+                15: 0.1,
+                75: 0.05,
+                120: 0.01}
 
 # scheduler:
 #   name: 'ExponentialLR'
@@ -52,7 +53,7 @@ run:
   train_noise: 0
 
 pretrained:
-  incre: True
+  incre: False
   # 88.91
   # load_model_path: './runs/pruning/mnist/ttm/ZO_SCD_batch/False/scratch_two_bz64_grad0.5_lr_0.01/20230329-080506/run_None/finetune_mnist_ttm2_r0.9_it0_best.pth.tar'
   # 91.31

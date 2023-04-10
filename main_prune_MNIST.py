@@ -58,7 +58,7 @@ def init_logger(config):
     path_pruner = os.path.join(path, 'pruner/%s.py' % config.pruner_file)
     # logger = get_logger('log', logpath=config.summary_dir + '/',
     #                     filepath=path_model, package_files=[path_main, path_pruner])
-    logger = get_logger('log', logpath=config.summary_dir,
+    logger = get_logger('log.log', logpath=config.summary_dir,
                         filepath=path_model, package_files=[path_main, path_pruner])
     logger.info(dict(config))
     writer = SummaryWriter(config.summary_dir)
