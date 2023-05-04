@@ -5,6 +5,20 @@ This is a PyTorch implementation of Zeroth-order training for MNIST dataset.
 * Sparse training: Prune at initialization (GraSP https://arxiv.org/abs/2002.07376)
 * Tensor-compressed models: TT-format and TTM-format
 
+
+
+# Requirements:
+
+- Python >= 3.6
+- PyTorch >= 1.8.0
+- Tensorflow >= 2.5.0
+- pyutils >= 0.0.1. See [pyutils](https://github.com/JeremieMelo/pyutility) for installation.
+  - A tricky part: comment line 32 of ./setup.py when installing pyutils.   tensorflow-gpu is not supported now
+- NVIDIA GPUs and CUDA >= 10.2
+- Others are listed in requirements.txt
+
+
+
 # Usage:
 
 ## MNIST
