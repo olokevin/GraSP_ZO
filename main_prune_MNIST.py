@@ -18,6 +18,7 @@ from utils.network_utils import get_network
 from utils.builder import build_model, build_optimizer, build_scheduler
 from models.model_base import ModelBase
 from pruner.GraSP_zo_mask import GraSP_zo_mask
+from pruner.GraSP_newHg import GraSP_newHg
 
 from pyutils.config import configs
 from pyutils.torch_train import (
@@ -329,6 +330,7 @@ def main():
     configs.load(args.config, recursive=False)  
 
     set_torch_deterministic(42)
+    print(torch.initial_seed())
 
     # ================== Prepare logger ==========================
     name_append = 'bz{}_grad{}_lr_{}'.format(configs.GraSP.batch_size, configs.optimizer.grad_sparsity, configs.GraSP.learning_rate)
@@ -438,6 +440,12 @@ def main():
                       samples_per_class=configs.GraSP.samples_per_class,
                       num_iters=configs.GraSP.num_iters,
                       tensorized=configs.model.tensorized)
+        
+        # masks, named_masks = GraSP_newHg(mb.model, ratio, trainloader, 'cuda',
+        #               num_classes=configs.GraSP.num_classes,
+        #               samples_per_class=configs.GraSP.samples_per_class,
+        #               num_iters=configs.GraSP.num_iters,
+        #               tensorized=configs.model.tensorized)
         iteration = 0
         print('=> Using GraSP')
         # ========== register mask ==================

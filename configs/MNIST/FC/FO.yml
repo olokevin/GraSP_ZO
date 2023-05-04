@@ -1,5 +1,5 @@
 GraSP:
-  exp_name: "scratch_vanilla"
+  exp_name: "scratch_oldHg"
   network: fc
   depth: 2
   dataset: mnist
@@ -19,7 +19,7 @@ GraSP:
   num_iters: 1
 
 optimizer:
-  name: SGD
+  name: ADAM
   grad_sparsity: 0
 
 scheduler:

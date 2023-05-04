@@ -1,5 +1,5 @@
 GraSP:
-  exp_name: "scratch_mom0.9"
+  exp_name: "scratch_oldHg"
   network: fc
   depth: 2
   dataset: mnist

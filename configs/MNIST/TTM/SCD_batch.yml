@@ -1,5 +1,5 @@
 GraSP:
-  exp_name: "scratch_STP_mom0.9"
+  exp_name: "scratch_mom0.95"
   network: ttm
   depth: 2
   dataset: mnist
@@ -23,9 +23,9 @@ optimizer:
   grad_estimator: batch
   grad_sparsity: 0.5
   opt_layers_strs: 'TensorizedLinear_module'
-  STP: True
+  STP: False
   debug: False
-  momentum: 0.9
+  momentum: 0.95
   weight_decay: 0.0001
   # adam: True
   # beta_1: 0.9
@@ -34,9 +34,9 @@ optimizer:
 scheduler:
   name: 'PresetLRScheduler'
   lr_schedule: {0: 1,
-                15: 0.1,
-                75: 0.05,
-                120: 0.01}
+                20: 0.1,
+                100: 0.05,
+                150: 0.01}
 
 # scheduler:
 #   name: 'ExponentialLR'

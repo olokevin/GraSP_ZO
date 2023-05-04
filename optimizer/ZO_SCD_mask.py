@@ -20,7 +20,6 @@ from pyutils.torch_train import (
 from torch import nn
 from torch.functional import Tensor
 from torch.optim import Optimizer
-from torchonn.op.mzi_op import RealUnitaryDecomposerBatch, checkerboard_to_vector, vector_to_checkerboard
 from tensor_layers.layers import TensorizedLinear_linear, TensorizedLinear_module, TensorizedLinear_module_tonn
 from tensor_fwd_bwd.tensorized_linear import TensorizedLinear
 # from tensorized_linear import TensorizedLinear
