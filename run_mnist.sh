@@ -1,1 +1,0 @@
-CUDA_VISIBLE_DEVICES=2 python -u main_prune_MNIST.py -config configs/MNIST/TTM/SGD.yml
