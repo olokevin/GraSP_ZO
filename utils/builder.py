@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from optimizer import ZO_SCD_mask, ZO_SGD_mask, ZO_SCD_esti, ZO_SCD_grad
+from optimizer import ZO_SCD_mask, ZO_SGD_mask
 from utils.common_utils import PresetLRScheduler
 from models.tensor_models import MNIST_FC, MNIST_CNN, MNIST_TTM, MNIST_TT
 

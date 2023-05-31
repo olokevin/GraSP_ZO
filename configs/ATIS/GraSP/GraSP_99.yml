@@ -12,7 +12,7 @@ GraSP:
   normalize: false
   target_ratio: 0.99
   pruner: GraSP
-  pruner_file: GraSP
+  pruner_file: GraSP_attn
   num_classes: 21
   samples_per_class: 10
   samples_batches: 5

@@ -27,12 +27,11 @@ from pyutils.torch_train import (
     set_torch_deterministic,
     set_torch_stochastic,
 )
-from optimizer import ZO_SCD_mask, ZO_SGD_mask, ZO_SCD_esti, ZO_SCD_grad
-
-# from tensor_layers.layers import TensorizedLinear_module
-# from tensor_fwd_bwd.tensorized_linear import TensorizedLinear
-
-from models.tensor_models import MNIST_FC, MNIST_CNN, MNIST_TTM, MNIST_TT
+from optimizer import ZO_SCD_mask, ZO_SGD_mask
+pruner_file_dict = {
+    'GraSP_zo_mask': GraSP_zo_mask,
+    'GraSP_newHg': GraSP_newHg
+}
 
 # disabled
 def init_config():
@@ -421,7 +420,7 @@ def main():
     # generate mask this time
     elif configs.GraSP.pruner != False:
         # ================== start pruning ==================
-        
+        pruner_file = configs.GraSP.pruner_file
         logger.info('** Target ratio: %.4f, iter ratio: %.4f, iteration: %d/%d.' % (target_ratio,
                                                                                     ratio,
                                                                                     1,
@@ -435,11 +434,15 @@ def main():
         
         print("Iteration of: %d/%d" % (iteration, num_iterations))
 
-        masks, named_masks = GraSP_zo_mask(mb.model, ratio, trainloader, 'cuda',
+        if pruner_file == 'GraSP_zo_mask':
+            masks, named_masks = GraSP_zo_mask(mb.model, ratio, trainloader, 'cuda',
                       num_classes=configs.GraSP.num_classes,
                       samples_per_class=configs.GraSP.samples_per_class,
                       num_iters=configs.GraSP.num_iters,
                       tensorized=configs.model.tensorized)
+        else:
+            raise ValueError('did not specify pruner_file or pruner_file not found')
+        
         
         # masks, named_masks = GraSP_newHg(mb.model, ratio, trainloader, 'cuda',
         #               num_classes=configs.GraSP.num_classes,
