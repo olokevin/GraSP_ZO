@@ -128,15 +128,17 @@ class ZO_SCD_mask(Optimizer):
                     str(i): getattr(layer.tensor,'factors')[i].view(-1)
                     for i in range(getattr(layer.tensor, 'order'))
                 }
+                trainable_parameters[layer_name]["bias"] = layer.bias.data
             elif isinstance(layer, (TensorizedLinear)):
                 trainable_parameters[layer_name] = {
                     str(i): getattr(layer.weight.factors, 'factor_'+str(i)).view(-1)
                     for i in range(getattr(layer.weight, 'order'))
                 }
+                trainable_parameters[layer_name]["bias"] = layer.bias.data
             elif isinstance(layer, (nn.Linear, nn.Conv2d)):
                 trainable_parameters[layer_name] = {  
                     param_name: getattr(layer, param_name).view(-1)
-                    for param_name in ["weight"]
+                    for param_name in ["weight","bias"]
                 }
         return trainable_parameters
     
@@ -151,6 +153,7 @@ class ZO_SCD_mask(Optimizer):
     #     }
 
     def enable_mixedtraining(self, masks):
+        # different from ZO_SGD!
         # need to change to index 
         # matrix: [4, 5, 6, 7]
         # mask:   [0, 1, 0, 1]
@@ -159,13 +162,14 @@ class ZO_SCD_mask(Optimizer):
             layer_name: {
                 p_name: torch.arange(p.numel(), device=p.device)[
                     masks[layer_name][p_name].to(p.device).bool().view(-1)
-                ]
+                ] if p_name != "bias"\
+                else torch.arange(p.numel(), device=p.device)
                 for p_name, p in layer_params.items()
             }
             for layer_name, layer_params in self.trainable_params.items()
         }
         print(self.mixedtrain_masks)
-
+    
     def disable_mixedtraining(self):
         self.mixedtrain_masks = {
             layer_name: {
@@ -197,15 +201,17 @@ class ZO_SCD_mask(Optimizer):
                     str(i): getattr(layer.tensor,'factors')[i].grad.view(-1)
                     for i in range(getattr(layer.tensor, 'order'))
                 }
+                grad_fo[layer_name]["bias"] = layer.bias.grad
             elif isinstance(layer, (TensorizedLinear)):
                 grad_fo[layer_name] = {
                     str(i): getattr(layer.weight.factors, 'factor_'+str(i)).grad.view(-1)
                     for i in range(getattr(layer.weight, 'order'))
                 }
+                grad_fo[layer_name]["bias"] = layer.bias.grad
             elif isinstance(layer, (nn.Linear, nn.Conv2d)):
                 grad_fo[layer_name] = {  
                     param_name: getattr(layer, param_name).grad.view(-1)
-                    for param_name in ["weight"]
+                    for param_name in ["weight","bias"]
                 }
         return grad_fo
 
@@ -217,6 +223,9 @@ class ZO_SCD_mask(Optimizer):
             }
             for layer_name, layer_params in params.items()
         }
+    
+    def get_forward_cnt(self):
+        return self.forward_counter
     
     def enable_STP(self):
         self.STP = True
@@ -232,17 +241,29 @@ class ZO_SCD_mask(Optimizer):
         if isinstance(layer, (TensorizedLinear_module_tonn)):
             raise NotImplementedError
         elif isinstance(layer, (TensorizedLinear_module)):
-            idx = int(param_name)
-            ttm_shape = layer.tensor.factors[idx].shape
-            layer.tensor.factors[idx].data = param.reshape(ttm_shape)
+            if param_name == 'bias':
+                layer.bias.data = param
+            else:
+                idx = int(param_name)
+                ttm_shape = layer.tensor.factors[idx].shape
+                layer.tensor.factors[idx].data = param.reshape(ttm_shape)
         elif isinstance(layer, (TensorizedLinear)):
-            idx = int(param_name)
-            tt_shape = (layer.weight.rank[idx],
-                        layer.weight.shape[idx],
-                        layer.weight.rank[idx+1])
-            # t_param = torch.nn.parameter.Parameter(param.reshape(tt_shape), requires_grad=False)
-            # setattr(layer.weight.factors, 'factor_'+param_name, t_param)
-            setattr(getattr(layer.weight.factors, 'factor_'+param_name), 'data', param.reshape(tt_shape))
+            if param_name == 'bias':
+                layer.bias.data = param
+            else:
+                idx = int(param_name)
+                if layer.factorization == 'tt':
+                    tt_shape = (layer.weight.rank[idx],
+                                layer.weight.shape[idx],
+                                layer.weight.rank[idx+1])
+                elif layer.factorization == 'blocktt':
+                    tt_shape = (layer.weight.rank[idx],
+                                layer.weight.tensorized_shape[0][idx],
+                                layer.weight.tensorized_shape[1][idx],
+                                layer.weight.rank[idx+1])
+                # t_param = torch.nn.parameter.Parameter(param.reshape(tt_shape), requires_grad=False)
+                # setattr(layer.weight.factors, 'factor_'+param_name, t_param)
+                setattr(getattr(layer.weight.factors, 'factor_'+param_name), 'data', param.reshape(tt_shape))
         elif isinstance(layer, (nn.Linear, nn.Conv2d)):
             if param_name == "weight":
                 layer.weight.data = param.reshape(layer.out_features, layer.in_features)
@@ -384,7 +405,6 @@ class ZO_SCD_mask(Optimizer):
                 for layer_name, layer_params in params.items()
             }
         
-
     def zo_coordinate_descent_batch(self, obj_fn, params):
         """
         description: stochastic coordinate-wise descent.
@@ -539,8 +559,6 @@ class ZO_SCD_mask(Optimizer):
             
             return (pred, pred_slot), loss
         return _obj_fn
-    
-    # ==================== For MNIST ====================
     
     def step(self, data, target, en_debug=False, ATIS=False):
         if ATIS == True:
